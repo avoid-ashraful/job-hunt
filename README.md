@@ -21,7 +21,12 @@ fetch ─► hard filters ─► never-seen-before ─► LLM eligibility + fit 
 3. **Never twice.** A job is new only if its ATS id, normalized link, and
    company + normalized title have never been reported. This catches reposts and
    the same job listed on several boards.
-4. **LLM screening** (Gemini, structured JSON). Reads the full description and
+4. **LLM screening** (structured JSON, 8 postings per request, 3 in parallel).
+   Models are tried in order from `llm.chain`: Gemini models first, then the
+   logged-in Claude Code CLI (`claude -p`) when every Gemini quota is used up. The
+   Gemini free tier allows only about 20 requests per model per day. Jobs left
+   unscreened make the next run re-fetch the full window, so nothing is lost. The
+   model reads the full description and
    judges location eligibility with a verbatim quote, plus role type, primary
    language, seniority, agency, working language and fit (1–5). A region tag
    alone never drops a job. The apply / check / drop decision is made in code

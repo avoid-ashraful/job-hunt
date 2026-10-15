@@ -109,6 +109,7 @@ llm:
   # Stage 2: reads each surviving posting; judges location eligibility + fit.
   prompt: prompts/eligibility.example.md
   batch_size: 8                    # postings per request
+  workers: 3                       # parallel requests
   call_cap: 300                    # max requests per run; unscreened jobs are retried next run
   # Tried in order; when a model's quota is exhausted the next one takes over.
   # Gemini free tier allows only ~20 requests/day per model. Enable billing on the

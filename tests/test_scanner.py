@@ -158,3 +158,25 @@ def test_postings_not_seen_live_recently_are_dropped(filters):
     job = make_job(last_seen_at=NOW - timedelta(days=5))
     assert filters.evaluate(job).startswith("not seen live")
     assert filters.evaluate(make_job(last_seen_at=NOW - timedelta(hours=6))) is None
+
+
+def test_store_never_reports_twice(tmp_path, filters):
+    from scanner.store import Store
+
+    store = Store(tmp_path / "s.sqlite")
+    assert store.is_empty()
+    job = make_job(id="greenhouse:acme:1")
+    filters.evaluate(job)
+    store.mark_reported(job, "2026-10-15")
+
+    same_link_new_id = make_job(id="lever:acme:9")
+    reposted = make_job(id="ashby:acme:7", url="https://jobs.ashbyhq.com/acme/7", title="Sr. Back-End Engineer (Remote)")
+    different = make_job(id="ashby:acme:8", url="https://jobs.ashbyhq.com/acme/8", title="Senior Python Engineer")
+    assert "same link" in store.already_reported(same_link_new_id)
+    assert "same company+title" in store.already_reported(reposted)
+    assert store.already_reported(different) is None
+
+    store.log_run("2026-10-15T05:00:00", 1, 1, 1, 1, "r.md", deferred=3)
+    assert not store.is_empty() and store.last_run_incomplete()
+    store.log_run("2026-10-16T05:00:00", 1, 1, 1, 1, "r.md", deferred=0)
+    assert not store.last_run_incomplete()

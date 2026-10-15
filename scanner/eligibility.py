@@ -13,7 +13,9 @@ import os
 import re
 import sqlite3
 import subprocess
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -187,6 +189,8 @@ class Screener:
     def __init__(self, cfg: dict, prompt_path: Path, db: sqlite3.Connection):
         self.batch_size = cfg.get("batch_size", 8)
         self.cap = cfg.get("call_cap", 300)
+        self.workers = cfg.get("workers", 3)
+        self.lock = threading.Lock()
         system = prompt_path.read_text() + BATCH_NOTE
         self.prompt_hash = hashlib.sha256((system + json.dumps(BATCH_SCHEMA, sort_keys=True)).encode()).hexdigest()[:12]
         self.clients = []
@@ -220,13 +224,18 @@ class Screener:
     def _screen_batch(self, batch: list[Job]) -> tuple[dict[str, dict], str]:
         refs = {f"J{i + 1}": job for i, job in enumerate(batch)}
         user = "\n".join(self._job_text(ref, job) for ref, job in refs.items())
-        while self.clients:
-            client = self.clients[0]
+        while True:
+            with self.lock:
+                if not self.clients:
+                    raise QuotaExhausted("every model in llm.chain is out of quota")
+                client = self.clients[0]
             try:
                 data = client.complete(user)
             except QuotaExhausted as exc:
-                log.warning("llm: %s exhausted (%s), switching to next model", client.name, exc)
-                self.clients.pop(0)
+                with self.lock:
+                    if self.clients and self.clients[0] is client:
+                        log.warning("llm: %s exhausted (%s), switching to next model", client.name, exc)
+                        self.clients.pop(0)
                 continue
             out = {}
             for item in data.get("results", []):
@@ -234,7 +243,6 @@ class Screener:
                 if job and all(k in item for k in SCHEMA["required"]):
                     out[job.id] = item
             return out, client.name
-        raise QuotaExhausted("every model in llm.chain is out of quota")
 
     def screen(self, jobs: list[Job]) -> tuple[dict[str, dict], list[Job]]:
         """Return ({job_id: result}, deferred_jobs). Results are cached per prompt version."""
@@ -247,30 +255,28 @@ class Screener:
         batches = [todo[i : i + self.batch_size] for i in range(0, len(todo), self.batch_size)]
         log.info("llm: %s cached, %s to screen in %s batches", len(results), len(todo), len(batches))
 
-        deferred: list[Job] = []
-        for n, batch in enumerate(batches, 1):
-            if n > self.cap:
-                deferred.extend(batch)
-                continue
-            try:
-                out, model = self._screen_batch(batch)
-            except QuotaExhausted as exc:
-                log.error("llm: %s; deferring the rest", exc)
-                for rest in batches[n - 1 :]:
-                    deferred.extend(rest)
-                break
-            except Exception as exc:  # one bad batch shouldn't sink the run
-                log.error("llm: batch %s failed: %s", n, exc)
-                deferred.extend(batch)
-                continue
-            now = datetime.now(timezone.utc).isoformat()
-            for job in batch:
-                if job.id in out:
-                    results[job.id] = out[job.id]
-                    self.db.execute("INSERT OR REPLACE INTO llm_screen VALUES (?, ?, ?, ?, ?)",
-                                    (job.id, self.prompt_hash, model, json.dumps(out[job.id]), now))
-                else:
-                    deferred.append(job)
-            self.db.commit()
-            log.info("llm: batch %s/%s done with %s", n, len(batches), model)
+        deferred: list[Job] = [job for batch in batches[self.cap :] for job in batch]
+        batches = batches[: self.cap]
+        done = 0
+        with ThreadPoolExecutor(self.workers) as pool:
+            futures = {pool.submit(self._screen_batch, batch): batch for batch in batches}
+            for fut in as_completed(futures):
+                batch = futures[fut]
+                try:
+                    out, model = fut.result()
+                except Exception as exc:  # quota gone or a bad response: retry these next run
+                    log.error("llm: batch failed: %s", exc)
+                    deferred.extend(batch)
+                    continue
+                now = datetime.now(timezone.utc).isoformat()
+                for job in batch:
+                    if job.id in out:
+                        results[job.id] = out[job.id]
+                        self.db.execute("INSERT OR REPLACE INTO llm_screen VALUES (?, ?, ?, ?, ?)",
+                                        (job.id, self.prompt_hash, model, json.dumps(out[job.id]), now))
+                    else:
+                        deferred.append(job)
+                self.db.commit()
+                done += 1
+                log.info("llm: batch %s/%s done with %s", done, len(batches), model)
         return results, deferred

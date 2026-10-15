@@ -38,7 +38,8 @@ CREATE INDEX IF NOT EXISTS reported_fp ON reported(fingerprint);
 CREATE TABLE IF NOT EXISTS runs (
     run_at TEXT NOT NULL,
     fetched INTEGER, passed INTEGER, new INTEGER, reported INTEGER,
-    report TEXT
+    report TEXT,
+    deferred INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -48,9 +49,18 @@ class Store:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path)
         self.db.executescript(SCHEMA)
+        cols = {row[1] for row in self.db.execute("PRAGMA table_info(runs)")}
+        if "deferred" not in cols:
+            self.db.execute("ALTER TABLE runs ADD COLUMN deferred INTEGER NOT NULL DEFAULT 0")
 
     def is_empty(self) -> bool:
-        return self.db.execute("SELECT 1 FROM jobs LIMIT 1").fetchone() is None
+        """No completed (non-dry) run yet, so the next run should backfill."""
+        return self.db.execute("SELECT 1 FROM runs LIMIT 1").fetchone() is None
+
+    def last_run_incomplete(self) -> bool:
+        """True when the previous run left jobs unscreened, so the next one must re-fetch the full window."""
+        row = self.db.execute("SELECT deferred FROM runs ORDER BY run_at DESC LIMIT 1").fetchone()
+        return bool(row and row[0])
 
     def upsert(self, job: Job, today: str) -> None:
         payload = json.dumps(asdict(job), default=str)
@@ -90,8 +100,12 @@ class Store:
             (job.id, job.url, fingerprint(job.company_key, job.title), job.company_key, job.family, job.rank, job.title, today),
         )
 
-    def log_run(self, run_at: str, fetched: int, passed: int, new: int, reported: int, report: str) -> None:
-        self.db.execute("INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?)", (run_at, fetched, passed, new, reported, report))
+    def log_run(self, run_at: str, fetched: int, passed: int, new: int, reported: int, report: str,
+                deferred: int) -> None:
+        self.db.execute(
+            "INSERT INTO runs (run_at, fetched, passed, new, reported, report, deferred) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (run_at, fetched, passed, new, reported, report, deferred),
+        )
 
     def commit(self) -> None:
         self.db.commit()

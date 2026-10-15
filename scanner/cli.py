@@ -45,7 +45,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     src = cfg["sources"]["freehire"]
     if days is None:
-        days = src["first_run_days"] if store.is_empty() else src["daily_lookback_days"]
+        full = store.is_empty() or store.last_run_incomplete()
+        days = src["first_run_days"] if full else src["daily_lookback_days"]
     log.info("fetching jobs first seen in the last %s days", days)
 
     # 1. fetch, deduplicating by id (one job can appear under several categories)
@@ -78,6 +79,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         new.append(job)
 
     # 4. LLM: can I be hired for it from where I live, and is it the right role?
+    deferred = []
     if not skip_llm:
         llm_cfg = cfg["llm"]
         screener = Screener(llm_cfg, ROOT / llm_cfg["prompt"], store.db)
@@ -120,7 +122,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     write_drop_log(state_dir / "dropped" / f"{today}.tsv", dropped)
     for job in new:
         store.mark_reported(job, today)
-    store.log_run(now.isoformat(), len(fetched), len(passed), len(new), len(new), str(report.relative_to(ROOT)))
+    store.log_run(now.isoformat(), len(fetched), len(passed), len(new), len(new), str(report.relative_to(ROOT)), len(deferred))
     store.commit()
     log.info("wrote %s", report)
     return report
