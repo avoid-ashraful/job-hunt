@@ -1,0 +1,11 @@
+# Personal data, secrets and outputs stay on this machine only.
+# private/ itself is tracked (README + .gitkeep files) so the layout is in the repo.
+private/config/*
+private/jobs/*
+private/state/*
+private/profile/*
+!private/**/.gitkeep
+.env
+__pycache__/
+.venv/
+*.pyc

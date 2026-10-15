@@ -1,0 +1,12 @@
+[submodule "vendor/career-ops"]
+	path = vendor/career-ops
+	url = https://github.com/career-ops-hq/career-ops.git
+	shallow = true
+[submodule "vendor/freehire"]
+	path = vendor/freehire
+	url = https://github.com/strelov1/freehire.git
+	shallow = true
+[submodule "vendor/remote-jobs"]
+	path = vendor/remote-jobs
+	url = https://github.com/remoteintech/remote-jobs.git
+	shallow = true

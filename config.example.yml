@@ -1,0 +1,123 @@
+# Example scanner config. Copy to private/config/config.yml and edit.
+# Regexes are Python `re`, matched case-insensitively unless noted.
+
+candidate:
+  country: Bangladesh
+  timezone: Asia/Dhaka
+  resume: private/profile/resume.pdf
+
+sources:
+  freehire:
+    enabled: true
+    base_url: https://freehire.me/api/v1
+    # freehire category facets used for recall; titles are filtered locally below.
+    categories: [backend, fullstack, software_engineering, ai_engineering, ml_ai, architecture]
+    work_mode: remote
+    seniority_exclude: [intern, junior]
+    first_run_days: 21          # backfill window on an empty database
+    daily_lookback_days: 3      # overlap on later runs; dedup removes repeats
+    page_size: 100
+    request_delay_s: 1.0
+
+filters:
+  max_age_days: 21              # age = earliest of posted date and first-seen date
+
+  # A title must match at least one family. Order matters: first match wins and is
+  # the "role family" used when collapsing seniority within a company.
+  role_families:
+    python:     ['\bpython\b', '\bdjango\b', '\bfastapi\b']
+    backend:    ['back[\s-]?end', '\bapi\b', 'platform engineer', 'server[\s-]?side']
+    fullstack:  ['full[\s-]?stack']
+    applied_ai: ['applied ai']
+    software:   ['software (engineer|developer|development engineer)', '\bswe\b', '\bsde\b']
+    generic:    ['^\W*((sr\.?|senior|staff|lead|principal)\s+)*(engineer|developer)\b']
+
+  title_exclude:
+    - 'front[\s-]?end'
+    - '\b(ios|android|mobile)\b'
+    - '\b(qa|sdet|test|testing|quality)\b'
+    - '\b(devops|sre|site reliability)\b'
+    - '\b(data (engineer|scientist|analyst)|analytics)\b'
+    - '\b(embedded|firmware|hardware)\b'
+    - '\b(salesforce|servicenow|sap|dynamics)\b'
+    - '\b(designer|sales|solutions? engineer|support engineer|customer)\b'
+    - '\b(junior|jr\.?|intern|internship|graduate|new grad|entry[\s-]level|apprentice|trainee)\b'
+    - '\bassociate (software )?(engineer|developer)\b'
+    - '\b(manager|director|head of|vp|vice president)\b'
+
+  stack:
+    # keep if Python evidence; else drop if another backend language is named; else keep
+    python_patterns: ['\bpython\b', '\bdjango\b', '\bfastapi\b', '\bflask\b']
+    other_language_patterns:
+      - '\bjava\b(?!script)'
+      - '\bgolang\b'
+      - '\b(ruby|rails)\b'
+      - '\b(php|laravel)\b'
+      - '(\.net\b|\bc#)'
+      - '\b(scala|kotlin|elixir|rust)\b'
+      - 'c\+\+'
+      - '\bnode\.?js\b'
+    # a title naming another language (and not Python) is dropped even if the
+    # description mentions Python somewhere
+    title_other_language_patterns:
+      - '\bgo(lang)?\b(?!-to)'
+      - '\bjava\b(?!script)'
+      - '\b(node(\.?js)?|ruby|rails|php|laravel|scala|kotlin|elixir|rust)\b'
+      - '(\.net\b|\bc#|c\+\+)'
+    other_language_skill_tags: [java, go, golang, ruby, php, csharp, dotnet, scala, kotlin, elixir, rust, cpp, nodejs]
+    strong: [django, drf, fastapi, celery, postgres, redis, aws, rabbitmq, clickhouse,
+             elasticsearch, docker, terraform, opentofu, opentelemetry, llm, rag, bedrock]
+
+  salary:
+    min_usd_year: 105000        # drop only when the stated max is below this
+    usd_rates: {USD: 1.0, EUR: 1.08, GBP: 1.27, CAD: 0.72, AUD: 0.65}
+    period_multipliers: {year: 1, month: 12, week: 52, day: 260, hour: 2080}
+
+  employment_types: [full_time, contract]   # unknown type is kept
+
+  hard_drop_patterns:           # matched against the full description: always dropped
+    us_work_authorization:
+      - 'authori[sz]ed to work (in|for) (the )?(u\.?s\.?a?|united states)'
+      - '(u\.?s\.?|united states) (citizen(ship)?|person)s?\b.{0,40}\b(only|required|requirement)'
+      - 'must (be|hold) (a )?(u\.?s\.?|united states) (citizen|green card)'
+      - '\bgreen card holders?\b'
+      - 'eligible to work in the (u\.?s\.?a?|united states) without'
+    security_clearance:
+      - '\b(security|secret|ts/sci|top secret|public trust) clearance\b'
+      - '\bclearance (is )?required\b'
+    w2_only:
+      - '\bw-?2\b.{0,25}\bonly\b'
+      - '\bonly\b.{0,25}\bw-?2\b'
+
+  exclude:
+    companies: []               # matched against company name and slug, whole words
+    company_types: [agency, outsource, outstaff]
+    domains: [gambling, crypto]
+    title_keywords: ['ai trainer', 'annotation', 'rlhf', 'data labell?ing', 'freelance']
+    summary_keywords: ['\b(defen[cs]e contractor|military|weapons?|munitions)\b', '\b(adult|porn)\b']
+
+  non_english: flag             # keep but tag
+
+dedup:
+  # a job is new only if none of these were reported before:
+  # source+external id, normalized URL, company+normalized-title fingerprint
+  collapse_window_days: 60      # remember reported seniority per company+family this long
+  seniority_rank: {principal: 4, staff: 4, lead: 4, senior: 3, middle: 2, unknown: 2}
+
+llm:
+  # Stage 2: reads each surviving posting; judges location eligibility + fit.
+  prompt: prompts/eligibility.example.md
+  batch_size: 8                    # postings per request
+  call_cap: 300                    # max requests per run; unscreened jobs are retried next run
+  # Tried in order; when a model's quota is exhausted the next one takes over.
+  # Gemini free tier allows only ~20 requests/day per model. Enable billing on the
+  # key for more, or rely on the Claude Code CLI fallback (uses the Claude subscription).
+  chain:
+    - {provider: gemini, model: gemini-flash-latest}
+    - {provider: gemini, model: gemini-3.5-flash}
+    - {provider: gemini, model: gemini-flash-lite-latest}
+    - {provider: claude-cli, model: sonnet}
+
+output:
+  jobs_dir: private/jobs
+  state_dir: private/state

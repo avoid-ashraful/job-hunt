@@ -1,0 +1,16 @@
+[project]
+name = "job-hunt-scanner"
+version = "0.1.0"
+description = "Daily scanner for remote tech jobs matching a personal profile"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
