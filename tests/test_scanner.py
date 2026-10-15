@@ -152,3 +152,9 @@ BASE = dict(eligibility="anywhere", eligibility_evidence="Work from anywhere", a
 )
 def test_decide(overrides, bucket):
     assert decide({**BASE, **overrides})[0] == bucket
+
+
+def test_postings_not_seen_live_recently_are_dropped(filters):
+    job = make_job(last_seen_at=NOW - timedelta(days=5))
+    assert filters.evaluate(job).startswith("not seen live")
+    assert filters.evaluate(make_job(last_seen_at=NOW - timedelta(hours=6))) is None

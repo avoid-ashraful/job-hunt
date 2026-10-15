@@ -21,6 +21,7 @@ sources:
 
 filters:
   max_age_days: 21              # age = earliest of posted date and first-seen date
+  not_seen_live_days: 3         # source hasn't seen the posting live for this long: probably closed
 
   # A title must match at least one family. Order matters: first match wins and is
   # the "role family" used when collapsing seniority within a company.

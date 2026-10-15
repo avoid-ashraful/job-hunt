@@ -24,6 +24,7 @@ class Filters:
     def __init__(self, cfg: dict, seniority_rank: dict[str, int], now: datetime):
         self.now = now
         self.max_age = timedelta(days=cfg["max_age_days"])
+        self.stale_after = timedelta(days=cfg.get("not_seen_live_days", 3))
         self.families = {name: _rx(pats) for name, pats in cfg["role_families"].items()}
         self.title_exclude = _rx(cfg["title_exclude"])
 
@@ -80,6 +81,8 @@ class Filters:
         anchor = job.age_anchor
         if anchor and self.now - anchor > self.max_age:
             return f"older than {self.max_age.days} days (first seen {anchor:%Y-%m-%d})"
+        if job.last_seen_at and self.now - job.last_seen_at > self.stale_after:
+            return f"not seen live since {job.last_seen_at:%Y-%m-%d} (probably closed)"
         return None
 
     def _title(self, job: Job) -> str | None:

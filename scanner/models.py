@@ -21,6 +21,7 @@ class Job:
     skills: list[str] = field(default_factory=list)
     posted_at: datetime | None = None
     first_seen_at: datetime | None = None  # when the source first recorded it
+    last_seen_at: datetime | None = None  # when the source last saw it live
     seniority: str | None = None
     category: str | None = None
     employment_type: str | None = None

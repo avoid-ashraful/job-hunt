@@ -134,6 +134,8 @@ delivery: [file]          # + telegram | email
 
 ## 5. Build phases
 
+Status (2026-10-15): phases 1, 2 and 4 are built (cron + daily markdown file). Phase 3 (career-ops second source) is next. Liveness currently relies on freehire's last-seen date.
+
 | Phase | Deliverable | How you'll know it works |
 |---|---|---|
 | 0 | Fill in `config.yml`; choose the LLM | — |

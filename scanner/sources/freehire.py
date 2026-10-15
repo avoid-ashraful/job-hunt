@@ -52,6 +52,7 @@ def to_job(raw: dict) -> Job:
         skills=raw.get("skills") or [],
         posted_at=_dt(raw.get("posted_at")),
         first_seen_at=_dt(raw.get("created_at")),
+        last_seen_at=_dt(raw.get("last_seen_at")),
         seniority=enr.get("seniority"),
         category=enr.get("category"),
         employment_type=enr.get("employment_type"),
