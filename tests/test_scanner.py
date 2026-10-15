@@ -5,7 +5,6 @@ import pytest
 import yaml
 
 from scanner.dedup import collapse_by_seniority, fingerprint, normalize_url
-from scanner.eligibility import decide
 from scanner.filters import Filters
 from scanner.models import Job
 
@@ -129,33 +128,75 @@ def test_collapse_respects_already_reported_seniority(filters):
     assert not kept and dropped
 
 
-BASE = dict(eligibility="anywhere", eligibility_evidence="Work from anywhere", allowed_locations="worldwide",
-            hiring_model="contractor", primary_language="Python", python_role=True, role_type="backend",
-            seniority="senior", people_manager=False, agency_or_outsourcing=False,
-            english_working_language=True, fit_score=4, fit_reason="")
+BASE = dict(eligibility="anywhere", eligibility_evidence="Work from anywhere", allowed_locations="worldwide")
+
+
+@pytest.fixture(scope="module")
+def location_rules(cfg):
+    from scanner.rules import LocationRules
+
+    return LocationRules(cfg["rules"]["location"])
 
 
 @pytest.mark.parametrize(
-    "overrides, bucket",
+    "text, outcome",
     [
-        ({}, "apply"),
-        ({"eligibility": "unclear"}, "check"),
-        ({"eligibility": "region_locked"}, "drop"),
-        ({"eligibility": "work_authorization_required"}, "drop"),
-        ({"python_role": False}, "drop"),
-        ({"role_type": "frontend_heavy_fullstack"}, "drop"),
-        ({"people_manager": True}, "drop"),
-        ({"agency_or_outsourcing": True}, "drop"),
-        ({"english_working_language": False}, "drop"),
-        ({"fit_score": 2}, "check"),
+        ("You must be located in the United States.", "locked"),
+        ("This role is remote within Canada.", "locked"),
+        ("We can only hire in the following countries: US, UK, Germany.", "locked"),
+        ("This role can be worked remotely from anywhere in the UK only.", "locked"),
+        ("The role is based in Europe.", "locked"),
+        ("Удаленная работа на территории РФ.", "locked"),
+        ("Work from anywhere in the world. We are async-first.", "positive"),
+        ("Remote (Worldwide)", "positive"),
+        ("Candidates must be located in Europe or Asia.", "positive"),
+        ("We are hiring in Bangladesh, India and Pakistan.", "positive"),
+        ("You need at least 4 hours of overlap with EST.", "timezone"),
+        ("We build developer tools. You will write Python.", "silent"),
+        ("We hire through Deel.", "ambiguous"),
+        ("Location: Europe", "ambiguous"),
+        ("Must be located in the US. Work from anywhere in the world!", "ambiguous"),
     ],
 )
-def test_decide(overrides, bucket):
-    assert decide({**BASE, **overrides})[0] == bucket
+def test_location_rules(location_rules, text, outcome):
+    assert location_rules.classify(make_job(description=text)).outcome == outcome
+
+
+def test_perk_is_not_eligibility(location_rules):
+    text = "You must be based in the UK. Work remotely anywhere in the world for up to 1 month per year."
+    assert location_rules.classify(make_job(description=text)).outcome == "locked"
+
+
+def test_generic_place_is_not_a_lock(location_rules):
+    assert location_rules.classify(make_job(description="You must be based in a quiet place.")).outcome == "silent"
+
+
+def test_us_abbreviation_does_not_break_sentences(location_rules):
+    v = location_rules.classify(make_job(description="Candidates must reside in the U.S. and work EST hours."))
+    assert v.outcome == "locked" and "US" in v.place
+
+
+@pytest.fixture(scope="module")
+def role_rules(cfg):
+    from scanner.rules import RoleRules
+
+    return RoleRules(cfg["rules"]["role"])
+
+
+def test_role_rules(role_rules):
+    assert role_rules.evaluate(make_job(description="We are hiring for our client, a fintech."))[0].startswith("agency.")
+    assert role_rules.evaluate(make_job(description="Python dev", posting_language="de")) is not None
+    assert role_rules.evaluate(make_job(description="Fluent English required. Python.", posting_language="de")) is None
+    fe = make_job(description="React React React CSS HTML Figma UI UX Tailwind frontend. Some API.")
+    fe.family = "fullstack"
+    assert role_rules.evaluate(fe)[0] == "role.frontend_heavy"
+    good = make_job(title="Senior Python Engineer", description="Python, Django, Celery, Postgres, Redis, AWS, Docker")
+    good.family = "python"
+    assert role_rules.fit_score(good)[0] >= 4
 
 
 def test_postings_not_seen_live_recently_are_dropped(filters):
-    job = make_job(last_seen_at=NOW - timedelta(days=5))
+    job = make_job(last_seen_at=NOW - timedelta(days=12))
     assert filters.evaluate(job).startswith("not seen live")
     assert filters.evaluate(make_job(last_seen_at=NOW - timedelta(hours=6))) is None
 
@@ -176,10 +217,8 @@ def test_store_never_reports_twice(tmp_path, filters):
     assert "same company+title" in store.already_reported(reposted)
     assert store.already_reported(different) is None
 
-    store.log_run("2026-10-15T05:00:00", 1, 1, 1, 1, "r.md", deferred=3)
-    assert not store.is_empty() and store.last_run_incomplete()
-    store.log_run("2026-10-16T05:00:00", 1, 1, 1, 1, "r.md", deferred=0)
-    assert not store.last_run_incomplete()
+    store.log_run("2026-10-15T05:00:00", 1, 1, 1, 1, "r.md", 0)
+    assert not store.is_empty()
 
 
 def test_location_verdicts_need_a_quote_from_the_description():

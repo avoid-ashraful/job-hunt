@@ -7,40 +7,57 @@ actually be hired from my country, and writes a short list of links to apply to.
 ## How it works
 
 ```
-fetch ─► hard filters ─► never-seen-before ─► LLM eligibility + fit ─► most senior per company ─► daily list
+fetch ─► hard filters ─► never-seen-before ─► role rules ─► location rules ─► AI (only if ambiguous) ─► most senior per company ─► daily list
 ```
+
+Rules first, AI last: deterministic parsers decide almost everything, and the AI is
+only asked when the location wording is ambiguous. Even then it only sees the
+relevant sentences, not the whole posting.
 
 1. **Fetch.** Remote jobs first seen in the last N days from the
    [freehire](https://github.com/strelov1/freehire) public API (3M+ postings
    crawled from Greenhouse, Lever, Ashby, Workday, remote boards, …).
-2. **Hard filters** (`config.yml`): title role families and exclusions, stack
-   (Python required unless the posting names no language), posting age (earliest of
-   posted / first-seen date), salary floor, employment type, excluded companies,
-   company types and industries, and hard drops such as US work authorization,
-   security clearance and W-2 only.
+2. **Hard filters** (`filters:` in config): title role families and exclusions,
+   stack (Python required unless the posting names no language), posting age
+   (earliest of posted / first-seen), not seen live for 10 days, salary floor,
+   employment and company type, industries, excluded companies, and hard drops
+   (US work authorization, clearance, W-2).
 3. **Never twice.** A job is new only if its ATS id, normalized link, and
-   company + normalized title have never been reported. This catches reposts and
-   the same job listed on several boards.
-4. **LLM screening** (structured JSON, 8 postings per request, 3 in parallel).
-   Models are tried in order from `llm.chain`: Gemini models first, then the
-   logged-in Claude Code CLI (`claude -p`) when every Gemini quota is used up. The
-   Gemini free tier allows only about 20 requests per model per day. Jobs left
-   unscreened make the next run re-fetch the full window, so nothing is lost. The
-   model reads the full description and
-   judges location eligibility with a verbatim quote, plus role type, primary
-   language, seniority, agency, working language and fit (1–5). A region tag
-   alone never drops a job. The apply / check / drop decision is made in code
-   from those facts (`scanner/eligibility.py`), and results are cached per job
-   and prompt version.
-5. **Most senior opening per company + role family.** This also takes into
-   account what was reported in the last 60 days.
-6. **Output:** `private/jobs/YYYY-MM-DD.md` with ✅ Apply and 🟡 Check tables.
-   Every dropped job and its reason is logged to `private/state/dropped/`.
+   company + normalized title were never reported. This catches reposts and the
+   same job listed on several boards.
+4. **Role rules** (`rules.role`): agency/outsourcing wording, working language,
+   frontend-heavy fullstack, plus a stack-based fit score (1–5).
+5. **Location rules** (`rules.location`): every sentence is matched against named
+   lock / positive / timezone patterns. A captured place is checked against the
+   candidate's region ("located in Europe or Asia" is fine), and perk wording
+   ("anywhere for 4 weeks a year") never counts. Outcomes:
+   - locked: dropped
+   - positive or timezone-only: eligible
+   - silent: Check
+   - ambiguous (conflicting or unrecognised location wording): sent to the AI
+6. **AI fallback** (`llm:`): a Gemini → Claude Code CLI chain judges only the
+   ambiguous jobs, in batches of 20, from the extracted sentences. Its quote must
+   come from the description, or the job goes to Check. It also spot-checks a
+   few rule decisions each run, which is how rule accuracy is measured.
+7. **Most senior opening per company + role family** (aware of the last 60 days).
+8. **Output:** `private/jobs/YYYY-MM-DD.md` with three tiers:
+   - ✅ **Apply**: the text confirms eligibility and the fit is good
+   - 🟡 **Check**: not confirmed, but the tags are compatible or the company is known to hire worldwide
+   - ⚪ **Long shots**: only a region tag that excludes you
+   Every job has a Ref for feedback.
+
+## Self-learning
+
+Every decision, AI call, spot-check and piece of feedback is logged. After a week,
+`uv run python -m scanner learn --days 7` writes an improvement report: rule
+accuracy, triggers that could become rules, uncovered phrases and feedback.
+See [docs/IMPROVING.md](docs/IMPROVING.md).
 
 ## Layout
 
 ```
-scanner/            pipeline code (sources/, filters, dedup, eligibility, report)
+scanner/            pipeline code (sources/, filters, rules, eligibility, dedup, report, learn)
+docs/IMPROVING.md   the weekly self-learning loop
 prompts/            example LLM prompt (the real one lives in private/config/prompts/)
 config.example.yml  example config (the real one lives in private/config/config.yml)
 scripts/daily.sh            cron entry point
@@ -80,7 +97,9 @@ echo "GEMINI_API_KEY=..." > private/config/.env
 ```bash
 uv run python -m scanner run              # full run: writes today's list, marks jobs as reported
 uv run python -m scanner run --dry-run    # print only; nothing is marked as reported
-uv run python -m scanner run --skip-llm   # stage 1 only (no LLM)
+uv run python -m scanner run --skip-llm   # rules only (ambiguous jobs go to Check)
+uv run python -m scanner feedback <ref> <label> [note]
+uv run python -m scanner learn --days 7
 uv run python -m scanner run --days 7     # override the fetch window
 uv run pytest
 ```

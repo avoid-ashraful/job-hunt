@@ -4,6 +4,10 @@
 candidate:
   country: Bangladesh
   timezone: Asia/Dhaka
+  # freehire region tags compatible with the candidate. A job whose text is silent about
+  # location stays in Check with these tags (or none); otherwise it's a "long shot".
+  tag_regions_ok: [global, apac]
+  company_priors: vendor/remote-jobs/src/companies   # remoteintech: companies that hire worldwide
   resume: private/profile/resume.pdf
 
 sources:
@@ -21,7 +25,7 @@ sources:
 
 filters:
   max_age_days: 21              # age = earliest of posted date and first-seen date
-  not_seen_live_days: 3         # source hasn't seen the posting live for this long: probably closed
+  not_seen_live_days: 10        # not seen live by the source for this long: probably closed (freehire re-crawls ~weekly)
 
   # A title must match at least one family. Order matters: first match wins and is
   # the "role family" used when collapsing seniority within a company.
@@ -83,6 +87,7 @@ filters:
       - 'must (be|hold) (a )?(u\.?s\.?|united states) (citizen|green card)'
       - '\bgreen card holders?\b'
       - 'eligible to work in the (u\.?s\.?a?|united states) without'
+      - '\b(?:a|be|being)\s+(?:u\.?s\.?|united states)\s+citizen\b'
     security_clearance:
       - '\b(security|secret|ts/sci|top secret|public trust) clearance\b'
       - '\bclearance (is )?required\b'
@@ -99,6 +104,72 @@ filters:
 
   non_english: flag             # keep but tag
 
+rules:
+  # Deterministic parsers (scanner/rules.py). Every pattern has a name; decisions are logged
+  # with "<group>.<name>" so `scanner learn` can report how often each rule fires and how
+  # often the AI spot-check agrees with it. Add new rules here; no code change needed.
+  location:
+    # A place captured by a lock rule is allowed if it matches candidate_place.
+    candidate_place: '\b(bangladesh|south asia|(?<!southeast )(?<!south-east )(?<!east )(?<!central )asia|apac|asia[- ]pacific|anywhere(?!\s+(?:with)?in\s+(?:the\s+)?(?!world\b))|worldwide|world|global(ly)?|any country|all countries|international(ly)?)\b'
+    # Places that are not a restriction ("authorized to work in the country where you reside").
+    neutral_place: '\b(country (where|in which|of residence)|your (country|location|home)|where you (live|reside|are)|which you reside|the country you)\b'
+    # Sentences about a work-from-anywhere *perk* never count as eligibility evidence.
+    perk: '\b(?:per year|a year|each year|per annum|weeks? (?:a|per|each)|days (?:a|per|each) year|workation|work from anywhere (?:policy|program|weeks?))\b'
+    timezone_place: '\b(time ?zones?|utc|gmt|est|pst|cet|eastern|pacific|central) '
+    lock:
+      must_reside: '\b(?:must|need to|needs to|required to|should|have to|has to|will need to)\s+(?:currently\s+)?(?:be\s+)?(?:physically\s+)?(?:located|based|residing|reside|live|living|a\s+(?:legal\s+)?resident)\s+(?:in|within|of)\s+(?P<place>[^.;:\n]{2,160})'
+      remote_within: '\b(?:remote|work options|working)\b[^.;\n]{0,25}?\b(?:within|in|across|spanning|throughout)\s+(?:the\s+)?(?P<place>(?:continental\s+)?(?:u\.?s\.?a?|united states|canada|uk|united kingdom|eu|europe|european union|eea|germany|france|spain|portugal|poland|netherlands|ireland|india|brazil|mexico|argentina|colombia|latam|latin america|australia|new zealand|philippines|ukraine|israel|south africa|nigeria|kenya|pakistan|egypt|turkey|romania)\b[^.;\n]{0,40})'
+      place_only: '\b(?P<place>u\.?s\.?a?|united states|canada|uk|eu|europe|latam|emea|north america)[\s-]+(?:only|based only|residents only)\b'
+      open_to: '\b(?:open|available)\s+(?:only\s+)?to\s+(?:candidates|applicants|residents|people|individuals|those|anyone)\s+(?:who\s+(?:are|live|reside)\s+)?(?:based|located|residing|living)?\s*(?:in|within|from)\s+(?P<place>[^.;:\n]{2,160})'
+      only_hiring: '\b(?:only|currently|exclusively)\s+(?:hiring|accepting|considering|recruiting|able to hire|able to employ)\s+(?:applications\s+|candidates\s+|applicants\s+|talent\s+|people\s+)?(?:from|in|based in|located in|who (?:live|reside) in)\s+(?P<place>[^.;:\n]{2,80})'
+      can_only_hire: '\b(?:can|are able to|is able to)\s+only\s+(?:hire|employ|consider|accept|support)\s+(?:candidates\s+|people\s+|applicants\s+|employees\s+|team members\s+)?(?:who\s+(?:live|reside)\s+)?(?:in|from|based in|located in)\s+(?P<place>[^.;:\n]{2,80})'
+      right_to_work: '\b(?:right|authori[sz]ation|authori[sz]ed|eligible|eligibility|permit(?:ted)?|legally able)\s+to\s+work\s+(?:in|for|within)\s+(?:the\s+)?(?P<place>[^.;:\n,]{2,40})'
+      russia: '(?P<place>на территории (?:рф|россии)|по тк рф|гражданств\w* рф|только (?:из|в) (?:рф|россии)|резидент\w* рф|город\w* рф|западнее урала)'
+      ukraine: '(?P<place>перебування в україні|в межах україни|tax residen\w+ in ukraine|резидент\w* україни)'
+      hiring_in: '\b(?:hiring|recruiting)\s+(?:for\s+this\s+(?:role|position)\s+)?(?:in|from|across)\s+(?:the\s+)?(?P<place>(?:u\.?s\.?a?|united states|canada|uk|united kingdom|eu|europe|european union|eea|germany|deutschland|france|spain|portugal|poland|netherlands|ireland|india|brazil|mexico|argentina|colombia|latam|latin america|australia|new zealand|philippines|ukraine|israel|south africa|nigeria|kenya|pakistan|egypt|turkey|romania|singapore|north america)\b[^.;:\n]{0,80})'
+      remote_from: '\b(?:work(?:ing)?\s+)?remote(?:ly)?\s+from\s+(?:the\s+)?(?P<place>[^.;:\n]{2,120})'
+      anywhere_within: '\banywhere\s+(?:with)?in\s+(?:the\s+)?(?P<place>[^.;:\n]{2,80})'
+      candidate_based: '(?:^\W*|\b(?:candidates?|you|applicants?|someone|ideally|currently|engineer|developer|role|position|job)\b[^.;\n]{0,40}?\b)(?:based|located|residing)\s+in\s+(?:the\s+)?(?P<place>(?:u\.?s\.?a?|united states|canada|uk|united kingdom|eu|europe|european union|eea|germany|deutschland|france|spain|portugal|poland|netherlands|ireland|india|brazil|mexico|argentina|colombia|latam|latin america|australia|new zealand|philippines|ukraine|israel|south africa|nigeria|kenya|pakistan|egypt|turkey|romania|singapore|north america)\b[^.;:\n]{0,80})'
+      following_places: '\b(?:work|working|reside|located|live|hire|hiring|remote)\b[^.;\n]{0,40}?(?P<place>(?:in\s+)?(?:one of\s+)?(?:the\s+)?following\s+(?:states|countries|locations|regions|cities)[^.\n]{0,200})'
+      entity_countries: '(?P<place>\b(?:one of our\s+|countries where we have (?:a |an )?(?:legal )?|locations where we have (?:a |an )?)entit(?:y|ies)\b[^.\n]{0,200})'
+    positive:
+      # not when it's a perk ("anywhere in the world for up to 4 weeks a year")
+      anywhere: '\b(?:work|working|live|living|based|remote(?:ly)?|hire|hiring|located)\b[^.;\n]{0,30}\banywhere\b(?:\s+in\s+the\s+world)?(?!\s+(?:in|within|across|inside)\s+(?:the\s+)?(?!world\b)\w)(?![^.;\n]{0,40}\b(?:per year|a year|each year|weeks?|days|months?)\b)'
+      worldwide: '\b(?:remote|hire|hiring|recruit\w*|position|role|job|open|candidates|applicants|location)\b[^.;\n]{0,25}\b(?:worldwide|world-wide|globally|from any country|in any country|any location|any time ?zone)\b'
+      remote_global_label: '\bremote\s*[(\-–:/|]\s*(?:worldwide|global|anywhere)\b'
+      candidate_country: '\bbangladesh\b'
+    # Restrictive-sounding but not conclusive (often just a label): sent to the AI.
+    weak_lock:
+      location_line: '^\W*(?:preferred\s+)?(?:candidate\s+)?(?:job\s+)?locations?(?:\(s\))?\s*[:\-–]\s*(?P<place>[^\n]{2,80})$'
+      pin_line: '^\W*📍\s*(?P<place>[^\n]{2,80})$'
+    # Positive but not conclusive: sent to the AI.
+    weak_positive:
+      eor: '\b(?:via|through|using|with|on)\s+(?:deel|remote\.com|oyster|rippling|papaya global|velocity global|multiplier|globalization partners)\b'
+      distributed: '\b(?:fully|globally|truly)\s+distributed\b'
+      many_countries: '\b(?:in|across|from)\s+\d{2,3}\+?\s+countries\b'
+    timezone:
+      overlap: '\b(?:overlap|time ?zones?|working hours|business hours|core hours|hours of)\b[^.;\n]{0,60}\b(?:est|edt|pst|pdt|cst|cet|cest|gmt|utc|et|pt|ct|eastern|pacific|central|us hours|european hours)\b'
+      overlap_rev: '\b(?:est|edt|pst|pdt|cet|gmt|utc|eastern|pacific)\b[^.;\n]{0,40}\b(?:overlap|working hours|business hours|time ?zone)\b'
+    # A sentence is "location wording" (ambiguous if no rule above decides it) when it has a cue AND a geography term.
+    cue: '\b(reside|residing|resident|located|based in|based out of|live in|living in|hire|hiring|employ|eligib\w*|open to|countries|work from|time ?zones?|relocat\w*)\b'
+    geo: '\b(u\.?s\.?a?|united states|america[s]?|canada|uk|united kingdom|eu|eea|emea|europe(an)?|latam|latin america|south america|apac|asia|africa|middle east|mena|india|pakistan|bangladesh|philippines|vietnam|indonesia|singapore|australia|new zealand|brazil|mexico|argentina|colombia|chile|peru|germany|france|spain|portugal|poland|netherlands|ireland|italy|sweden|norway|denmark|finland|switzerland|austria|belgium|czech\w*|romania|bulgaria|ukraine|serbia|croatia|greece|turkey|israel|egypt|nigeria|kenya|south africa|japan|korea|china|taiwan|hong kong|malaysia|thailand|uae|dubai|saudi|qatar|deutschland|україн\w*|рф|росси\w*|following (?:states|countries|locations|regions|cities)|entit(?:y|ies))\b'
+    max_snippet_chars: 1500
+  role:
+    agency:
+      for_our_client: '\b(?:for|on behalf of)\s+(?:our|a|one of our)\s+(?:client|customer|partner)s?\b'
+      our_client_is: '\bour client(?:\s+is|,)'
+      our_partner_is: '\bour (?:partner|client) is (?:looking|seeking|hiring|searching)\b'
+      staffing: '\b(?:staff augmentation|outstaff\w*|outsourc\w+ (?:company|agency|partner)|body ?shop|nearshore|near-shore|recruit(?:ing|ment) (?:agency|firm|partner)|staffing (?:agency|firm|company)|talent (?:agency|marketplace))\b'
+      dev_shop: '\bwe are a (?:software |web |digital )?(?:development|outsourcing|consulting|staffing) (?:company|agency|firm|studio|shop)\b'
+    english_mentioned: '\b(english|англи\w+|inglés|anglais|englisch|inglês|angielski)\b'
+    frontend_terms: '\b(react|vue|angular|svelte|next\.?js|css|html|tailwind|figma|ui|ux|frontend|front-end|redux|storybook|responsive|accessibility|design system)\b'
+    backend_terms: '\b(python|django|fastapi|flask|api|apis|database|postgres\w*|mysql|sql|backend|back-end|server|microservices?|aws|kafka|redis|celery|distributed|scalab\w+)\b'
+    frontend_heavy_ratio: 2.0
+    fit:
+      core: ['\bpython\b', '\bdjango\b', '\bfastapi\b']
+      strong: ['\bdjango\b', '\bdjango rest\b|\bdrf\b', '\bfastapi\b', '\bcelery\b', '\bpostgres\w*\b', '\bredis\b', '\baws\b', '\brabbitmq\b', '\bclickhouse\b', '\belasticsearch\b', '\bdocker\b', '\bterraform\b|\bopentofu\b', '\bkubernetes\b', '\bopentelemetry\b|\bgrafana\b', '\bllm\b|\brag\b|\bbedrock\b|\blangchain\b', '\bmicroservices?\b', '\bkafka\b', '\breact\b', '\btypescript\b']
+    min_fit_for_apply: 3
+
 dedup:
   # a job is new only if none of these were reported before:
   # source+external id, normalized URL, company+normalized-title fingerprint
@@ -106,11 +177,14 @@ dedup:
   seniority_rank: {principal: 4, staff: 4, lead: 4, senior: 3, middle: 2, unknown: 2}
 
 llm:
-  # Stage 2: reads each surviving posting; judges location eligibility + fit.
+  # Used only when the location rules are stuck (ambiguous wording), plus a few
+  # spot-checks of rule decisions per run to measure rule accuracy over time.
+  # The model sees the title, tags and the location sentences, not the full posting.
   prompt: prompts/eligibility.example.md
-  batch_size: 8                    # postings per request
+  batch_size: 20                   # postings per request
   workers: 3                       # parallel requests
-  call_cap: 300                    # max requests per run; unscreened jobs are retried next run
+  call_cap: 40                     # max requests per run; unscreened ambiguous jobs go to Check
+  audit_per_run: 10                # rule decisions spot-checked by the AI each run
   # Tried in order; when a model's quota is exhausted the next one takes over.
   # flash-lite was tried and dropped: too loose on location evidence.
   # Gemini free tier allows only ~20 requests/day per model. Enable billing on the

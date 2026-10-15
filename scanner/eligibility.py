@@ -1,7 +1,9 @@
-"""Stage 2: LLM reads each surviving posting and judges location eligibility and role fit.
+"""LLM fallback for location eligibility, used only when the rules are stuck.
 
-The model fills in facts (with a verbatim quote for location); the final
-apply / check / drop decision is made here in code, so it stays consistent.
+The model sees the title, the source's location tags and the location
+sentences the rules extracted, not the whole description. It returns one
+eligibility label with a verbatim quote. The same call is used to spot-check a
+sample of rule decisions (audits), which is how rule accuracy is measured.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import sqlite3
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,54 +25,21 @@ from pathlib import Path
 import requests
 
 from scanner.models import Job
+from scanner.rules import normalize_text
 
 log = logging.getLogger(__name__)
 
+ELIGIBILITY = ["anywhere", "includes_candidate", "timezone_only", "unclear", "region_locked",
+               "work_authorization_required"]
 SCHEMA = {
     "type": "object",
     "properties": {
-        "eligibility": {
-            "type": "string",
-            "enum": ["anywhere", "includes_candidate", "timezone_only", "unclear",
-                     "region_locked", "work_authorization_required"],
-        },
+        "eligibility": {"type": "string", "enum": ELIGIBILITY},
         "eligibility_evidence": {"type": "string"},
         "allowed_locations": {"type": "string", "description": "short, e.g. 'worldwide', 'US only', 'EU + UK'"},
-        "hiring_model": {"type": "string", "enum": ["employee", "eor", "contractor", "unknown"]},
-        "primary_language": {"type": "string"},
-        "python_role": {"type": "boolean"},
-        "role_type": {
-            "type": "string",
-            "enum": ["backend", "backend_heavy_fullstack", "frontend_heavy_fullstack", "applied_ai",
-                     "ml_research", "data", "devops", "other"],
-        },
-        "seniority": {"type": "string", "enum": ["junior", "mid", "senior", "staff_plus", "lead", "unknown"]},
-        "people_manager": {"type": "boolean"},
-        "agency_or_outsourcing": {"type": "boolean"},
-        "english_working_language": {"type": "boolean"},
-        "fit_score": {"type": "integer", "minimum": 1, "maximum": 5},
-        "fit_reason": {"type": "string", "description": "at most 25 words"},
     },
-    "required": ["eligibility", "eligibility_evidence", "allowed_locations", "hiring_model", "primary_language",
-                 "python_role", "role_type", "seniority", "people_manager", "agency_or_outsourcing",
-                 "english_working_language", "fit_score", "fit_reason"],
+    "required": ["eligibility", "eligibility_evidence", "allowed_locations"],
 }
-
-ELIGIBLE = {"anywhere", "includes_candidate", "timezone_only"}
-DROP_ROLE_TYPES = {"frontend_heavy_fullstack", "ml_research", "data", "devops", "other"}
-MAX_DESCRIPTION_CHARS = 20_000
-
-CACHE_SCHEMA = """
-CREATE TABLE IF NOT EXISTS llm_screen (
-    job_id TEXT NOT NULL,
-    prompt_hash TEXT NOT NULL,
-    model TEXT NOT NULL,
-    result TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (job_id, prompt_hash)
-);
-"""
-
 BATCH_SCHEMA = {
     "type": "object",
     "properties": {
@@ -84,31 +54,39 @@ BATCH_SCHEMA = {
     },
     "required": ["results"],
 }
-
 BATCH_NOTE = (
-    "\n\n## Batch format\nYou will receive several postings, each starting with `### JOB <ref>`. "
-    "Judge each one independently, using only its own text, and return one entry per posting in "
-    "`results`, with `job_ref` set to its ref."
+    "\n\n## Batch format\nYou will receive several postings, each starting with `### JOB <ref>`, followed by "
+    "its title, tags and the sentences from its description that mention location. Judge each one "
+    "independently and return one entry per posting in `results`, with `job_ref` set to its ref."
 )
+CACHE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS llm_location (
+    job_id TEXT NOT NULL,
+    prompt_hash TEXT NOT NULL,
+    model TEXT NOT NULL,
+    result TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (job_id, prompt_hash)
+);
+"""
+POSITIVE = {"anywhere", "includes_candidate"}
+NEGATIVE = {"region_locked", "work_authorization_required"}
 
 
 class QuotaExhausted(Exception):
     """This model is out of quota for a long time; move on to the next one."""
 
 
-POSITIVE = {"anywhere", "includes_candidate"}
-
-
 def _norm(text: str) -> str:
+    text = normalize_text(text)
     text = text.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
     return " ".join(text.lower().split())
 
 
 def check_evidence(job: Job, r: dict) -> dict:
-    """Location verdicts must rest on the description body, not on tags or the title.
+    """A lock or "anywhere" verdict must quote the description body, not the title or tags.
 
-    A region lock or "anywhere" whose quote is empty, or only repeats the title or
-    location tag, is downgraded to "unclear" so the job lands in Check instead of
+    Otherwise it is downgraded to "unclear", so the job lands in Check instead of
     being dropped (or trusted) on metadata alone.
     """
     if r["eligibility"] not in POSITIVE | {"region_locked"}:
@@ -121,34 +99,9 @@ def check_evidence(job: Job, r: dict) -> dict:
     body = _norm(job.description)
     quoted = all(part.strip(" .,;") in body for part in re.split(r"\.\.\.|…", ev) if part.strip(" .,;"))
     if from_meta or not quoted:
-        note = f" [model said {r['eligibility']}, but the quote isn't from the description]"
-        return {**r, "eligibility": "unclear", "fit_reason": r["fit_reason"] + note}
+        return {**r, "eligibility": "unclear",
+                "allowed_locations": f"{r['allowed_locations']} (model said {r['eligibility']}, no quote from the text)"}
     return r
-
-
-def decide(r: dict) -> tuple[str, str]:
-    """Map the model's facts to (bucket, reason). Bucket is apply / check / drop."""
-    if r["eligibility"] == "work_authorization_required":
-        return "drop", f"needs work authorization ({r['allowed_locations']})"
-    if r["eligibility"] == "region_locked":
-        return "drop", f"region locked ({r['allowed_locations']})"
-    if not r["python_role"]:
-        return "drop", f"not a Python role ({r['primary_language']})"
-    if r["role_type"] in DROP_ROLE_TYPES:
-        return "drop", f"role type {r['role_type']}"
-    if r["people_manager"]:
-        return "drop", "people-manager role"
-    if r["agency_or_outsourcing"]:
-        return "drop", "agency / outsourcing employer"
-    if not r["english_working_language"]:
-        return "drop", "working language is not English"
-    if r["seniority"] == "junior":
-        return "drop", "junior role"
-    if r["fit_score"] <= 1:
-        return "drop", "poor fit"
-    if r["eligibility"] in ELIGIBLE and r["fit_score"] >= 3:
-        return "apply", r["eligibility"]
-    return "check", "location unclear" if r["eligibility"] == "unclear" else "low fit"
 
 
 class GeminiClient:
@@ -214,20 +167,21 @@ def _retry_seconds(msg: str) -> int | None:
 
 
 class Screener:
-    """Screens jobs in batches, walking down a chain of models as quotas run out."""
+    """Location-only LLM calls in batches, walking down a chain of models as quotas run out."""
 
-    def __init__(self, cfg: dict, prompt_path: Path, db: sqlite3.Connection):
-        self.batch_size = cfg.get("batch_size", 8)
-        self.cap = cfg.get("call_cap", 300)
+    def __init__(self, cfg: dict, prompt_path: Path, db: sqlite3.Connection,
+                 log_call: Callable[[str, str, int, bool, float, int], None] | None = None):
+        self.batch_size = cfg.get("batch_size", 20)
+        self.cap = cfg.get("call_cap", 50)
         self.workers = cfg.get("workers", 3)
         self.lock = threading.Lock()
+        self.log_call = log_call or (lambda *a: None)
         system = prompt_path.read_text() + BATCH_NOTE
         self.prompt_hash = hashlib.sha256((system + json.dumps(BATCH_SCHEMA, sort_keys=True)).encode()).hexdigest()[:12]
         self.clients = []
         for entry in cfg["chain"]:
             if entry["provider"] == "gemini":
-                key = os.environ.get("GEMINI_API_KEY")
-                if key:
+                if key := os.environ.get("GEMINI_API_KEY"):
                     self.clients.append(GeminiClient(entry["model"], key, system))
             elif entry["provider"] == "claude-cli":
                 self.clients.append(ClaudeCliClient(entry["model"], system))
@@ -235,78 +189,76 @@ class Screener:
             raise RuntimeError("no usable LLM in llm.chain (missing GEMINI_API_KEY?)")
         self.db = db
         self.db.executescript(CACHE_SCHEMA)
+        self.calls = 0
 
     def _cached(self, job: Job) -> dict | None:
         row = self.db.execute(
-            "SELECT result FROM llm_screen WHERE job_id = ? AND prompt_hash = ?", (job.id, self.prompt_hash)
+            "SELECT result FROM llm_location WHERE job_id = ? AND prompt_hash = ?", (job.id, self.prompt_hash)
         ).fetchone()
         return json.loads(row[0]) if row else None
 
     @staticmethod
-    def _job_text(ref: str, job: Job) -> str:
+    def _job_text(ref: str, job: Job, snippets: list[str]) -> str:
+        body = "\n".join(f"- {s}" for s in snippets) or "- (no sentence in the description mentions location)"
         return (
             f"### JOB {ref}\nTitle: {job.title}\nCompany: {job.company}\n"
             f"Location tag: {job.location or '-'}\nRegion tags: {', '.join(job.regions) or '-'}\n"
-            f"Country tags: {', '.join(job.countries) or '-'}\n\n"
-            f"{job.description[:MAX_DESCRIPTION_CHARS]}\n"
+            f"Location sentences from the description:\n{body}\n"
         )
 
-    def _screen_batch(self, batch: list[Job]) -> tuple[dict[str, dict], str]:
-        refs = {f"J{i + 1}": job for i, job in enumerate(batch)}
-        user = "\n".join(self._job_text(ref, job) for ref, job in refs.items())
+    def _batch(self, batch: list[tuple[Job, list[str]]], purpose: str) -> tuple[dict[str, dict], str]:
+        refs = {f"J{i + 1}": item for i, item in enumerate(batch)}
+        user = "\n".join(self._job_text(ref, job, snippets) for ref, (job, snippets) in refs.items())
         while True:
             with self.lock:
                 if not self.clients:
                     raise QuotaExhausted("every model in llm.chain is out of quota")
+                if self.calls >= self.cap:
+                    raise QuotaExhausted(f"call cap {self.cap} reached")
+                self.calls += 1
                 client = self.clients[0]
+            started = time.monotonic()
             try:
                 data = client.complete(user)
             except QuotaExhausted as exc:
+                self.log_call(client.name, purpose, len(batch), False, time.monotonic() - started, len(user))
                 with self.lock:
                     if self.clients and self.clients[0] is client:
                         log.warning("llm: %s exhausted (%s), switching to next model", client.name, exc)
                         self.clients.pop(0)
                 continue
+            self.log_call(client.name, purpose, len(batch), True, time.monotonic() - started, len(user))
             out = {}
             for item in data.get("results", []):
-                job = refs.get(item.pop("job_ref", ""))
-                if job and all(k in item for k in SCHEMA["required"]):
-                    out[job.id] = item
+                job_snip = refs.get(item.pop("job_ref", ""))
+                if job_snip and all(k in item for k in SCHEMA["required"]) and item["eligibility"] in ELIGIBILITY:
+                    out[job_snip[0].id] = item
             return out, client.name
 
-    def screen(self, jobs: list[Job]) -> tuple[dict[str, dict], list[Job]]:
-        """Return ({job_id: result}, deferred_jobs). Results are cached per prompt version."""
-        results, todo = {}, []
-        for job in jobs:
+    def screen(self, items: list[tuple[Job, list[str]]], purpose: str = "screen") -> dict[str, tuple[dict, str]]:
+        """Return {job_id: (result, model)}. Jobs missing from the result couldn't be screened."""
+        results: dict[str, tuple[dict, str]] = {}
+        todo = []
+        for job, snippets in items:
             if (cached := self._cached(job)) is not None:
-                results[job.id] = cached
+                results[job.id] = (cached, "cache")
             else:
-                todo.append(job)
+                todo.append((job, snippets))
         batches = [todo[i : i + self.batch_size] for i in range(0, len(todo), self.batch_size)]
-        log.info("llm: %s cached, %s to screen in %s batches", len(results), len(todo), len(batches))
-
-        deferred: list[Job] = [job for batch in batches[self.cap :] for job in batch]
-        batches = batches[: self.cap]
-        done = 0
+        if batches:
+            log.info("llm %s: %s cached, %s to screen in %s batches", purpose, len(results), len(todo), len(batches))
         with ThreadPoolExecutor(self.workers) as pool:
-            futures = {pool.submit(self._screen_batch, batch): batch for batch in batches}
+            futures = {pool.submit(self._batch, batch, purpose): batch for batch in batches}
             for fut in as_completed(futures):
-                batch = futures[fut]
                 try:
                     out, model = fut.result()
-                except Exception as exc:  # quota gone or a bad response: retry these next run
-                    log.error("llm: batch failed: %s", exc)
-                    deferred.extend(batch)
+                except Exception as exc:  # quota gone or a bad response: those jobs go to Check
+                    log.error("llm %s: batch failed: %s", purpose, exc)
                     continue
                 now = datetime.now(timezone.utc).isoformat()
-                for job in batch:
-                    if job.id in out:
-                        results[job.id] = out[job.id]
-                        self.db.execute("INSERT OR REPLACE INTO llm_screen VALUES (?, ?, ?, ?, ?)",
-                                        (job.id, self.prompt_hash, model, json.dumps(out[job.id]), now))
-                    else:
-                        deferred.append(job)
+                for job_id, result in out.items():
+                    results[job_id] = (result, model)
+                    self.db.execute("INSERT OR REPLACE INTO llm_location VALUES (?, ?, ?, ?, ?)",
+                                    (job_id, self.prompt_hash, model, json.dumps(result), now))
                 self.db.commit()
-                done += 1
-                log.info("llm: batch %s/%s done with %s", done, len(batches), model)
-        return results, deferred
+        return results

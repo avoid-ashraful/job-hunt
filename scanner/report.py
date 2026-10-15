@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from scanner.models import Job
+from scanner.store import job_ref
 
 
 def _cell(text: str) -> str:
@@ -23,26 +24,29 @@ def _salary(job: Job) -> str:
 
 
 def _sort_key(job: Job):
-    fit = (job.screen or {}).get("fit_score", 0)
+    fit = (job.screen or {}).get("fit", 0)
     return (-fit, "global" not in job.regions, -(job.age_anchor.timestamp() if job.age_anchor else 0))
 
 
-def _table(jobs: list[Job]) -> list[str]:
-    lines = [
-        "| # | Fit | Company | Title | Who can apply | Evidence | Salary | First seen | Apply |",
-        "|---|---|---|---|---|---|---|---|---|",
-    ]
-    for i, job in enumerate(sorted(jobs, key=_sort_key), 1):
+def _decided_by(sc: dict) -> str:
+    rule = sc.get("decided_by", "")
+    return f"AI ({rule.split(':')[-1]})" if rule.startswith("llm:") else rule
+
+
+def _table(jobs: list[Job], with_why: bool) -> list[str]:
+    head = "| Ref | Fit | Company | Title | Who can apply | Evidence | Decided by |" + (" Why here |" if with_why else "")
+    lines = [head + " Salary | First seen | Apply |", "|" + "---|" * (head.count("|") + 2)]
+    for job in sorted(jobs, key=_sort_key):
         sc = job.screen or {}
-        who = sc.get("allowed_locations") or job.location or ", ".join(job.regions)
-        evidence = sc.get("eligibility_evidence") or ""
+        who = sc.get("allowed") or job.location or ", ".join(job.regions) or "-"
+        evidence = sc.get("evidence") or ""
         evidence = f"“{evidence[:180]}”" if evidence else f"_tag only: {job.location or '-'}_"
         seen = f"{job.age_anchor:%b %d}" if job.age_anchor else ""
-        fit = f"{sc['fit_score']}/5" if sc.get("fit_score") else ""
-        title = job.title + (f" ({sc['hiring_model']})" if sc.get("hiring_model") in {"contractor", "eor"} else "")
+        why_text = "; ".join(x for x in (sc.get("why", ""), sc.get("prior", "")) if x)
+        why = f" {_cell(why_text)} |" if with_why else ""
         lines.append(
-            f"| {i} | {fit} | {_cell(job.company)} | {_cell(title)} | {_cell(who)} | {_cell(evidence)} | "
-            f"{_salary(job)} | {seen} | [apply]({job.url}) |"
+            f"| `{job_ref(job.id)}` | {sc.get('fit', '')}/5 | {_cell(job.company)} | {_cell(job.title)} | {_cell(who)} | "
+            f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_salary(job)} | {seen} | [apply]({job.url}) |"
         )
     return lines
 
@@ -54,24 +58,36 @@ def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, dro
     else:
         lines.append(f"# New jobs, {run_at:%Y-%m-%d}\n")
     apply = [j for j in jobs if j.bucket == "apply"]
-    check = [j for j in jobs if j.bucket != "apply"]
+    check = [j for j in jobs if j.bucket == "check"]
+    longshot = [j for j in jobs if j.bucket == "longshot"]
     lines.append(
-        f"Fetched **{stats['fetched']}** unique postings → **{stats['passed']}** passed filters → "
-        f"**{len(apply)}** to apply + **{len(check)}** to check.\n"
+        f"Fetched **{stats['fetched']}** postings → **{stats['passed']}** passed filters → "
+        f"**{len(apply)}** to apply, **{len(check)}** to check, {len(longshot)} long shots. "
+        f"Rules decided most; {stats['ambiguous']} had unclear location wording "
+        f"({stats['llm_calls']} AI requests).\n"
     )
 
     lines.append(f"## ✅ Apply ({len(apply)})\n")
-    lines.append(f"The posting says (or clearly implies) someone in {country} can be hired.\n")
-    lines += _table(apply) if apply else ["_None today._"]
+    lines.append(f"The posting's own text says someone in {country} can be hired, or only asks for timezone overlap.\n")
+    lines += _table(apply, with_why=False) if apply else ["_None today._"]
 
     lines.append(f"\n## 🟡 Check ({len(check)})\n")
-    lines.append("Location unclear (often a region tag with nothing in the text), or a weaker fit. Read before applying.\n")
-    lines += _table(check) if check else ["_None today._"]
+    lines.append("Not ruled out, but eligibility isn't confirmed by the text (or the stack fit is weak). Read before applying.\n")
+    lines += _table(check, with_why=True) if check else ["_None today._"]
+
+    lines.append(f"\n<details><summary>⚪ Long shots ({len(longshot)}): the text says nothing about location and the "
+                 f"source tags a region that doesn't include {country}</summary>\n")
+    lines += _table(longshot, with_why=True) if longshot else ["_None today._"]
+    lines.append("\n</details>\n")
 
     lines.append("\n<details><summary>Why jobs were dropped</summary>\n")
     for reason, count in drop_counts.most_common():
         lines.append(f"- {count} × {reason}")
     lines.append("\n</details>\n")
+    lines.append(
+        "Feedback helps the scanner learn: `uv run python -m scanner feedback <Ref> <label> [note]` "
+        "with label `applied`, `good`, `not-eligible`, `eligible`, `not-relevant`, `duplicate` or `closed`.\n"
+    )
 
     with path.open("a") as fh:
         fh.write("\n".join(lines) + "\n")
@@ -90,6 +106,10 @@ def reason_bucket(reason: str) -> str:
     """Collapse per-job details so the summary groups similar reasons."""
     if reason.startswith("llm: "):
         return reason.split(' "')[0].split(" (")[0]
+    if reason.startswith("region locked"):
+        return "region locked (rule)"
+    if reason.startswith(("agency.", "language.", "role.")):
+        return reason.split(":")[0]
     for prefix in ("older than", "title excluded", "gig/excluded title", "no Python", "salary max",
                    "already reported", "lower seniority", "excluded company", "excluded domain",
                    "excluded industry", "company type", "employment type", "not seen live",

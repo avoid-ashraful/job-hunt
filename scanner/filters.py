@@ -24,7 +24,7 @@ class Filters:
     def __init__(self, cfg: dict, seniority_rank: dict[str, int], now: datetime):
         self.now = now
         self.max_age = timedelta(days=cfg["max_age_days"])
-        self.stale_after = timedelta(days=cfg.get("not_seen_live_days", 3))
+        self.stale_after = timedelta(days=cfg.get("not_seen_live_days", 10))
         self.families = {name: _rx(pats) for name, pats in cfg["role_families"].items()}
         self.title_exclude = _rx(cfg["title_exclude"])
 
