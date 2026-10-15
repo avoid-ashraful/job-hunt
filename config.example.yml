@@ -112,12 +112,12 @@ llm:
   workers: 3                       # parallel requests
   call_cap: 300                    # max requests per run; unscreened jobs are retried next run
   # Tried in order; when a model's quota is exhausted the next one takes over.
+  # flash-lite was tried and dropped: too loose on location evidence.
   # Gemini free tier allows only ~20 requests/day per model. Enable billing on the
   # key for more, or rely on the Claude Code CLI fallback (uses the Claude subscription).
   chain:
     - {provider: gemini, model: gemini-flash-latest}
     - {provider: gemini, model: gemini-3.5-flash}
-    - {provider: gemini, model: gemini-flash-lite-latest}
     - {provider: claude-cli, model: sonnet}
 
 output:

@@ -20,13 +20,15 @@ Base every location judgement on the posting's own words. Quote them verbatim.
 - `includes_candidate`: a list of allowed countries or regions includes the candidate's country or region.
 - `timezone_only`: the only constraint is working-hours overlap (e.g. "4 hours overlap with EST"). That's fine for this candidate.
 - US-style benefits (401k, US health insurance) and US-only salary ranges are weak signals: mention them, but they alone don't make a job `region_locked`.
-- `eligibility_evidence` must be a verbatim quote from the posting that supports the eligibility value, or "" if the posting says nothing about location.
+- Not enough on its own (use `unclear`): "fully remote", "remote-first", "remote team", "international team", "global clients", "independent contractor", or "we can hire in any country where we have a legal entity" without a list of those countries.
+- Pay ranges or benefits stated for one country ("US pay range", "401k") are NOT a location restriction.
+- `eligibility_evidence` must be a verbatim quote from the posting's description body that supports the eligibility value, or "" if the body says nothing about location. Never quote the Title, Location tag, Region tags or Country tags lines: those are metadata, not evidence.
 
 ## Role rules
 - `python_role`: true when Python is a main language of this job, or the posting is language-agnostic. False when the job is clearly built around another language (Go, Java, Node.js, Ruby, .NET, …) and Python is at most incidental.
 - `role_type`: `backend_heavy_fullstack` vs `frontend_heavy_fullstack` depends on where most of the listed responsibilities and requirements are.
 - `people_manager`: true for roles whose main job is managing people (Engineering Manager, Head of, Director). Tech Lead or Lead Engineer roles that still write code are false.
-- `agency_or_outsourcing`: true when the employer is a staffing, outsourcing, outstaffing or dev-shop company placing engineers with its clients ("for our client", "outstaff", "body shop"), or a recruiting agency.
+- `agency_or_outsourcing`: true when the employer is a staffing, outsourcing, outstaffing, dev-shop or virtual-assistant company placing engineers with its clients ("for our client", "outstaff", "body shop", "our partner company"), a recruiting agency, or a job board reposting someone else's job.
 - `english_working_language`: false if the job requires fluency in a language other than English for daily work, or targets a local non-English market only.
 - `fit_score` (1–5): how well this candidate matches the role's requirements and seniority. 5 = near-perfect, 3 = reasonable, 1 = poor.
 

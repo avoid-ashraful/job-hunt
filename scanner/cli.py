@@ -8,11 +8,12 @@ import os
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
 from scanner.dedup import collapse_by_seniority, fingerprint
-from scanner.eligibility import Screener, decide
+from scanner.eligibility import Screener, check_evidence, decide
 from scanner.filters import Filters
 from scanner.report import reason_bucket, write_drop_log, write_report
 from scanner.sources import freehire
@@ -40,7 +41,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     store = Store(state_dir / "scanner.sqlite")
 
     now = datetime.now(timezone.utc)
-    local_now = datetime.now()
+    local_now = datetime.now(ZoneInfo(cfg["candidate"].get("timezone", "UTC")))
     today = local_now.date().isoformat()
 
     src = cfg["sources"]["freehire"]
@@ -88,7 +89,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         for job in new:
             if job.id not in results:
                 continue
-            job.screen = results[job.id]
+            job.screen = check_evidence(job, results[job.id])
             bucket, why = decide(job.screen)
             if bucket == "drop":
                 evidence = job.screen.get("eligibility_evidence") or ""

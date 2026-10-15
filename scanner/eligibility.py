@@ -96,6 +96,36 @@ class QuotaExhausted(Exception):
     """This model is out of quota for a long time; move on to the next one."""
 
 
+POSITIVE = {"anywhere", "includes_candidate"}
+
+
+def _norm(text: str) -> str:
+    text = text.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
+    return " ".join(text.lower().split())
+
+
+def check_evidence(job: Job, r: dict) -> dict:
+    """Location verdicts must rest on the description body, not on tags or the title.
+
+    A region lock or "anywhere" whose quote is empty, or only repeats the title or
+    location tag, is downgraded to "unclear" so the job lands in Check instead of
+    being dropped (or trusted) on metadata alone.
+    """
+    if r["eligibility"] not in POSITIVE | {"region_locked"}:
+        return r
+    ev = _norm(r.get("eligibility_evidence") or "").strip("\"' .")
+    meta = [_norm(x) for x in (job.title, job.location, *job.regions, *job.countries) if x]
+    from_meta = not ev or ev.startswith(("location tag", "title:", "region tags", "country tags")) or any(
+        ev == m or ev in m for m in meta
+    )
+    body = _norm(job.description)
+    quoted = all(part.strip(" .,;") in body for part in re.split(r"\.\.\.|…", ev) if part.strip(" .,;"))
+    if from_meta or not quoted:
+        note = f" [model said {r['eligibility']}, but the quote isn't from the description]"
+        return {**r, "eligibility": "unclear", "fit_reason": r["fit_reason"] + note}
+    return r
+
+
 def decide(r: dict) -> tuple[str, str]:
     """Map the model's facts to (bucket, reason). Bucket is apply / check / drop."""
     if r["eligibility"] == "work_authorization_required":

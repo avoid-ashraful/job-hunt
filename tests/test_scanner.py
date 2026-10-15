@@ -180,3 +180,18 @@ def test_store_never_reports_twice(tmp_path, filters):
     assert not store.is_empty() and store.last_run_incomplete()
     store.log_run("2026-10-16T05:00:00", 1, 1, 1, 1, "r.md", deferred=0)
     assert not store.last_run_incomplete()
+
+
+def test_location_verdicts_need_a_quote_from_the_description():
+    from scanner.eligibility import check_evidence
+
+    job = make_job(location="UA", description="We’re hiring engineers. Work from anywhere in the world... async-first team.")
+    tag_only = check_evidence(job, {**BASE, "eligibility": "region_locked", "eligibility_evidence": "Location tag: UA"})
+    assert tag_only["eligibility"] == "unclear"
+    made_up = check_evidence(job, {**BASE, "eligibility": "anywhere", "eligibility_evidence": "Hire globally via Deel"})
+    assert made_up["eligibility"] == "unclear"
+    real = check_evidence(job, {**BASE, "eligibility": "anywhere",
+                                "eligibility_evidence": "“Work from anywhere in the world… async-first team”"})
+    assert real["eligibility"] == "anywhere"
+    tz = check_evidence(job, {**BASE, "eligibility": "timezone_only", "eligibility_evidence": ""})
+    assert tz["eligibility"] == "timezone_only"
