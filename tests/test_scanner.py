@@ -234,3 +234,30 @@ def test_location_verdicts_need_a_quote_from_the_description():
     assert real["eligibility"] == "anywhere"
     tz = check_evidence(job, {**BASE, "eligibility": "timezone_only", "eligibility_evidence": ""})
     assert tz["eligibility"] == "timezone_only"
+
+
+def test_screener_runs_batches_in_threads_and_logs_calls(tmp_path, monkeypatch):
+    """Regression: call logging used to touch sqlite from worker threads."""
+    from scanner import eligibility
+    from scanner.store import Store
+
+    class FakeClient:
+        name = "fake:model"
+
+        def complete(self, user):
+            refs = [line.split()[2] for line in user.splitlines() if line.startswith("### JOB")]
+            return {"results": [{"job_ref": r, "eligibility": "anywhere", "eligibility_evidence": "x",
+                                 "allowed_locations": "worldwide"} for r in refs]}
+
+    store = Store(tmp_path / "s.sqlite")
+    prompt = tmp_path / "p.md"
+    prompt.write_text("judge location")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    calls = []
+    screener = eligibility.Screener({"chain": [{"provider": "gemini", "model": "m"}], "batch_size": 2, "workers": 3},
+                                    prompt, store.db, log_call=lambda *a: (calls.append(a), store.log_llm_call("d", *a)))
+    screener.clients = [FakeClient()]
+    jobs = [(make_job(id=f"j{i}"), ["Work from anywhere"]) for i in range(7)]
+    results = screener.screen(jobs)
+    assert len(results) == 7 and len(calls) == 4
+    assert store.db.execute("SELECT COUNT(*) FROM llm_calls").fetchone()[0] == 4

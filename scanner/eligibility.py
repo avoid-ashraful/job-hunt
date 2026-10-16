@@ -176,6 +176,7 @@ class Screener:
         self.workers = cfg.get("workers", 3)
         self.lock = threading.Lock()
         self.log_call = log_call or (lambda *a: None)
+        self._pending_calls: list[tuple] = []  # written by the main thread: sqlite isn't thread-safe
         system = prompt_path.read_text() + BATCH_NOTE
         self.prompt_hash = hashlib.sha256((system + json.dumps(BATCH_SCHEMA, sort_keys=True)).encode()).hexdigest()[:12]
         self.clients = []
@@ -221,13 +222,14 @@ class Screener:
             try:
                 data = client.complete(user)
             except QuotaExhausted as exc:
-                self.log_call(client.name, purpose, len(batch), False, time.monotonic() - started, len(user))
                 with self.lock:
+                    self._pending_calls.append((client.name, purpose, len(batch), False, time.monotonic() - started, len(user)))
                     if self.clients and self.clients[0] is client:
                         log.warning("llm: %s exhausted (%s), switching to next model", client.name, exc)
                         self.clients.pop(0)
                 continue
-            self.log_call(client.name, purpose, len(batch), True, time.monotonic() - started, len(user))
+            with self.lock:
+                self._pending_calls.append((client.name, purpose, len(batch), True, time.monotonic() - started, len(user)))
             out = {}
             for item in data.get("results", []):
                 job_snip = refs.get(item.pop("job_ref", ""))
@@ -250,6 +252,7 @@ class Screener:
         with ThreadPoolExecutor(self.workers) as pool:
             futures = {pool.submit(self._batch, batch, purpose): batch for batch in batches}
             for fut in as_completed(futures):
+                self._flush_calls()
                 try:
                     out, model = fut.result()
                 except Exception as exc:  # quota gone or a bad response: those jobs go to Check
@@ -261,4 +264,11 @@ class Screener:
                     self.db.execute("INSERT OR REPLACE INTO llm_location VALUES (?, ?, ?, ?, ?)",
                                     (job_id, self.prompt_hash, model, json.dumps(result), now))
                 self.db.commit()
+        self._flush_calls()
         return results
+
+    def _flush_calls(self) -> None:
+        with self.lock:
+            pending, self._pending_calls = self._pending_calls, []
+        for call in pending:
+            self.log_call(*call)
