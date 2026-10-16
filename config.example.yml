@@ -194,9 +194,14 @@ llm:
   audit_per_run: 10                # rule decisions spot-checked by the AI each run
   # Tried in order; when a model's quota is exhausted the next one takes over.
   # flash-lite was tried and dropped: too loose on location evidence.
+  # Any OpenAI-compatible endpoint works (key read from a file), e.g. OrcaRouter's
+  # free models; DeepSeek V4 Flash agreed with Claude on 87% of location calls.
+  # OpenCode Zen's free models only work inside the OpenCode app.
   # Gemini free tier allows only ~20 requests/day per model. Enable billing on the
   # key for more, or rely on the Claude Code CLI fallback (uses the Claude subscription).
   chain:
+    - {provider: openai-compatible, name: orca, base_url: "https://api.orcarouter.ai/v1",
+       model: deepseek/deepseek-v4-flash-free, api_key_file: ~/.config/job-hunt/orca.key}
     - {provider: gemini, model: gemini-flash-latest}
     - {provider: gemini, model: gemini-3.5-flash}
     - {provider: claude-cli, model: sonnet}

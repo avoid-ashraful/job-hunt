@@ -279,3 +279,61 @@ def test_screener_runs_batches_in_threads_and_logs_calls(tmp_path, monkeypatch):
     results = screener.screen(jobs)
     assert len(results) == 7 and len(calls) == 4
     assert store.db.execute("SELECT COUNT(*) FROM llm_calls").fetchone()[0] == 4
+
+
+def test_json_is_recovered_from_fences_and_prose():
+    from scanner.eligibility import _parse_json
+
+    assert _parse_json('```json\n{"results": []}\n```') == {"results": []}
+    assert _parse_json('Here you go: {"results": [1]} hope that helps') == {"results": [1]}
+
+
+def test_openai_compatible_entry_reads_key_file_and_skips_when_missing(tmp_path, monkeypatch):
+    from scanner import eligibility
+    from scanner.store import Store
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    prompt = tmp_path / "p.md"
+    prompt.write_text("judge location")
+    key = tmp_path / "orca.key"
+    key.write_text("secret\n")
+    entry = {"provider": "openai-compatible", "name": "orca", "base_url": "https://x/v1/", "model": "m-free"}
+    chain = [{**entry, "api_key_file": str(tmp_path / "missing.key")}, {**entry, "api_key_file": str(key)}]
+    screener = eligibility.Screener({"chain": chain}, prompt, Store(tmp_path / "s.sqlite").db)
+    [client] = screener.clients
+    assert client.name == "orca:m-free" and client.url == "https://x/v1/chat/completions"
+    assert client.api_key == "secret"
+
+
+def test_openai_compatible_timeouts_move_on_to_the_next_model(monkeypatch):
+    import pytest
+    import requests
+
+    from scanner import eligibility
+
+    client = eligibility.OpenAICompatClient("orca", "https://x/v1", "m", "k", "sys")
+    tries = []
+
+    def hang(*a, **kw):
+        tries.append(1)
+        raise requests.Timeout("read timed out")
+
+    monkeypatch.setattr(client.session, "post", hang)
+    with pytest.raises(eligibility.QuotaExhausted):
+        client.complete("### JOB J1")
+    assert len(tries) == 2
+
+
+@pytest.mark.parametrize("evidence, kept", [
+    ("Enjoy the freedom to work from anywhere, with flexible hours", False),
+    ("Work from anywhere to facilitate your work life balance", False),
+    ("Work from anywhere in the world", True),
+    ("We hire people based anywhere, in any country", True),
+    ("Remote-Global", True),
+])
+def test_bare_work_from_anywhere_is_not_worldwide(evidence, kept):
+    from scanner.eligibility import check_evidence
+
+    job = make_job(description=f"About us. {evidence}. Apply now.")
+    r = check_evidence(job, {**BASE, "eligibility": "anywhere", "eligibility_evidence": evidence})
+    assert (r["eligibility"] == "anywhere") is kept

@@ -35,8 +35,8 @@ relevant sentences, not the whole posting.
    - positive or timezone-only: eligible
    - silent: Check
    - ambiguous (conflicting or unrecognised location wording): sent to the AI
-6. **AI fallback** (`llm:`): a Gemini → Claude Code CLI chain judges only the
-   ambiguous jobs, in batches of 20, from the extracted sentences. Its quote must
+6. **AI fallback** (`llm:`): a free OpenAI-compatible model → Gemini → Claude Code CLI
+   chain judges only the ambiguous jobs, in batches of 20, from the extracted sentences. Its quote must
    come from the description, or the job goes to Check. It also spot-checks a
    few rule decisions each run, which is how rule accuracy is measured.
 7. **Most senior opening per company + role family** (aware of the last 60 days).

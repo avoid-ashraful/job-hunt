@@ -70,6 +70,9 @@ CREATE TABLE IF NOT EXISTS llm_location (
 );
 """
 POSITIVE = {"anywhere", "includes_candidate"}
+# "work from anywhere" alone is usually a perk or a home-office note, not proof they hire in every country
+BARE_ANYWHERE = re.compile(r"\b(work|working|live|based)\b.{0,25}\banywhere\b")
+WORLDWIDE = re.compile(r"world|any country|countries|global|international|wherever you (are|live)")
 NEGATIVE = {"region_locked", "work_authorization_required"}
 
 
@@ -101,6 +104,9 @@ def check_evidence(job: Job, r: dict) -> dict:
     if from_meta or not quoted:
         return {**r, "eligibility": "unclear",
                 "allowed_locations": f"{r['allowed_locations']} (model said {r['eligibility']}, no quote from the text)"}
+    if r["eligibility"] == "anywhere" and BARE_ANYWHERE.search(ev) and not WORLDWIDE.search(ev):
+        return {**r, "eligibility": "unclear",
+                "allowed_locations": f"{r['allowed_locations']} (model said anywhere, but only from a bare 'work from anywhere')"}
     return r
 
 
@@ -137,6 +143,52 @@ class GeminiClient:
             text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             return json.loads(text)
         raise QuotaExhausted(f"{self.name} kept failing")
+
+
+class OpenAICompatClient:
+    """Any OpenAI-compatible endpoint (e.g. OrcaRouter's free models). The key is read from a file."""
+
+    def __init__(self, name: str, base_url: str, model: str, api_key: str, system: str):
+        self.name = f"{name}:{model}"
+        self.url = base_url.rstrip("/") + "/chat/completions"
+        self.model = model
+        self.api_key = api_key
+        # json_object mode has no schema parameter, so the schema goes in the system prompt
+        self.system = system + "\n\nReturn a JSON object matching this JSON Schema:\n" + json.dumps(BATCH_SCHEMA)
+        self.session = requests.Session()
+
+    def complete(self, user: str, retries: int = 5) -> dict:
+        body = {"model": self.model, "temperature": 0, "response_format": {"type": "json_object"},
+                "messages": [{"role": "system", "content": self.system}, {"role": "user", "content": user}]}
+        for attempt in range(retries):
+            try:
+                resp = self.session.post(self.url, json=body, timeout=180,
+                                         headers={"Authorization": f"Bearer {self.api_key}"})
+            except (requests.Timeout, requests.ConnectionError) as exc:  # free endpoints hang now and then
+                if attempt >= 1:
+                    raise QuotaExhausted(f"{self.name}: {type(exc).__name__} twice") from exc
+                continue
+            if resp.status_code in (401, 402, 403, 404, 410):
+                raise QuotaExhausted(f"{self.name}: HTTP {resp.status_code} {resp.text[:120]}")
+            if resp.status_code == 429 or resp.status_code >= 500:
+                if attempt == retries - 1:
+                    raise QuotaExhausted(f"{self.name}: HTTP {resp.status_code} after {retries} tries")
+                time.sleep(_retry_seconds(resp.text) or min(60, 2 ** (attempt + 2)))
+                continue
+            resp.raise_for_status()
+            text = resp.json()["choices"][0]["message"]["content"] or ""
+            return _parse_json(text)
+        raise QuotaExhausted(f"{self.name} kept failing")
+
+
+def _parse_json(text: str) -> dict:
+    """Models without schema enforcement sometimes wrap JSON in prose or code fences."""
+    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("{"), text.rfind("}")
+        return json.loads(text[start : end + 1])
 
 
 class ClaudeCliClient:
@@ -186,6 +238,13 @@ class Screener:
                     self.clients.append(GeminiClient(entry["model"], key, system))
             elif entry["provider"] == "claude-cli":
                 self.clients.append(ClaudeCliClient(entry["model"], system))
+            elif entry["provider"] == "openai-compatible":
+                key_file = Path(entry["api_key_file"]).expanduser()
+                if key_file.exists():
+                    self.clients.append(OpenAICompatClient(entry.get("name", "openai"), entry["base_url"],
+                                                           entry["model"], key_file.read_text().strip(), system))
+                else:
+                    log.warning("llm: %s skipped, key file %s not found", entry.get("name"), key_file)
         if not self.clients:
             raise RuntimeError("no usable LLM in llm.chain (missing GEMINI_API_KEY?)")
         self.db = db
