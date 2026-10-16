@@ -48,6 +48,7 @@ class Filters:
         self.company_types = set(ex.get("company_types", []))
         self.domains = set(ex.get("domains", []))
         self.title_keywords = _rx(ex.get("title_keywords", []))
+        self.company_name_keywords = _rx(ex.get("company_name_keywords", []))
         self.summary_keywords = _rx(ex.get("summary_keywords", []))
         self.non_english = cfg.get("non_english", "flag")
         self.seniority_rank = seniority_rank
@@ -75,6 +76,8 @@ class Filters:
         for p in self.companies:
             if p.search(names):
                 return f"excluded company ({job.company})"
+        if m := _first(self.company_name_keywords, names):
+            return f"staffing/agency company name ('{m.group(0)}': {job.company})"
         return None
 
     def _age(self, job: Job) -> str | None:

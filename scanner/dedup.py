@@ -9,7 +9,8 @@ TRACKING_PARAMS = re.compile(r"^(utm_|gh_src$|source$|ref$|lever-source|src$)", 
 
 # Words that vary between copies of the same posting but don't change the job.
 TITLE_NOISE = re.compile(
-    r"\b(remote|hybrid|anywhere|worldwide|global|usa?|uk|eu|emea|apac|latam|americas|europe|"
+    r"\b(remote|hybrid|anywhere|worldwide|global|usa?|uk|eu|emea|apac|latam|americas|europe|united states|"
+    r"united kingdom|canada|india|germany|poland|spain|portugal|brazil|mexico|argentina|ukraine|philippines|"
     r"m/?f/?[dx]|f/?m/?[dx]|w/?m/?d|all genders?|full[\s-]?time|contract)\b",
     re.I,
 )

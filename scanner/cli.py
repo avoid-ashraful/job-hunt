@@ -129,8 +129,13 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
             job.screen["why"] = "description says nothing about location"
             check.append(job)
             store.log_decision(today, job.id, "location", v.rule, "check", "")
-        else:  # positive / timezone
-            job.screen["eligibility"] = "timezone_only" if v.outcome == "timezone" else "anywhere"
+        elif v.outcome == "timezone":  # only working hours are stated: not proof they hire abroad
+            job.screen.update(eligibility="timezone_only", why="only a working-hours requirement; location not stated")
+            check.append(job)
+            rule_decided.append((job, v))
+            store.log_decision(today, job.id, "location", v.rule, "check", v.evidence)
+        else:  # positive
+            job.screen["eligibility"] = "anywhere"
             eligible.append(job)
             rule_decided.append((job, v))
             store.log_decision(today, job.id, "location", v.rule, "eligible", v.evidence)
@@ -155,10 +160,11 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         if r["eligibility"] in NEGATIVE:
             drop(job, "llm", r["eligibility"], f"llm: {r['eligibility']} ({r['allowed_locations']}): "
                                                f"\"{r['eligibility_evidence'][:160]}\"")
-        elif r["eligibility"] == "unclear":
-            job.screen["why"] = "AI couldn't tell from the text"
+        elif r["eligibility"] in ("unclear", "timezone_only"):
+            job.screen["why"] = ("AI: only a working-hours requirement" if r["eligibility"] == "timezone_only"
+                                 else "AI couldn't tell from the text")
             check.append(job)
-            store.log_decision(today, job.id, "llm", "unclear", "check", r["allowed_locations"])
+            store.log_decision(today, job.id, "llm", r["eligibility"], "check", r["eligibility_evidence"])
         else:
             eligible.append(job)
             store.log_decision(today, job.id, "llm", r["eligibility"], "eligible", r["eligibility_evidence"])

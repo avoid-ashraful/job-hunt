@@ -69,6 +69,7 @@ class LocationRules:
         self.timezone_place = re.compile(cfg["timezone_place"], re.I)
         self.cue = re.compile(cfg["cue"], re.I)
         self.perk = re.compile(cfg.get("perk", r"(?!x)x"), re.I)
+        self.ignore = re.compile(cfg.get("ignore_sentence", r"(?!x)x"), re.I)
         self.geo = re.compile(cfg["geo"], re.I)
         self.max_snippet_chars = cfg.get("max_snippet_chars", 1500)
 
@@ -79,7 +80,7 @@ class LocationRules:
             return "neutral"
         if self.candidate_place.search(place):
             return "candidate"
-        if re.search(r"\btime ?zones?\b", place, re.I):
+        if re.match(r"(?:an?\s+|the\s+)?(?:\w+\s+){0,2}time ?zones?\b", place, re.I):
             return "timezone"  # "located in a US time zone" is a working-hours constraint
         if self.geo.search(place):
             return "lock"
@@ -90,12 +91,14 @@ class LocationRules:
     def classify(self, job: Job) -> Verdict:
         locks, positives, weak, zones, snippets = [], [], [], [], []
         for sent in sentences(job.description):
+            if self.ignore.search(sent):
+                continue
             hit = False
             perk = bool(self.perk.search(sent))
             for name, rx in self.lock.items():
                 for m in rx.finditer(sent):
                     kind = self._place_kind(m)
-                    hit = hit or kind != "neutral"
+                    hit = hit or (kind != "neutral" and not (perk and kind == "candidate"))
                     if kind == "lock":
                         locks.append((f"lock.{name}", sent, _place(m)))
                     elif kind == "candidate" and not perk:
@@ -116,7 +119,7 @@ class LocationRules:
                     positives.append((f"positive.{name}", sent, ""))
                     hit = True
             for name, rx in self.weak_positive.items():
-                if rx.search(sent):
+                if not perk and rx.search(sent):
                     weak.append((f"weak.{name}", sent, ""))
                     hit = True
             for name, rx in self.timezone.items():

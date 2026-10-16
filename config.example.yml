@@ -67,7 +67,7 @@ filters:
     title_other_language_patterns:
       - '\bgo(lang)?\b(?!-to)'
       - '\bjava\b(?!script)'
-      - '\b(node(\.?js)?|ruby|rails|php|laravel|scala|kotlin|elixir|rust)\b'
+      - '\b(node(\.?js)?|nest\.?js|ruby|rails|php|laravel|scala|kotlin|elixir|rust)\b'
       - '(\.net\b|\bc#|c\+\+)'
     other_language_skill_tags: [java, go, golang, ruby, php, csharp, dotnet, scala, kotlin, elixir, rust, cpp, nodejs]
     strong: [django, drf, fastapi, celery, postgres, redis, aws, rabbitmq, clickhouse,
@@ -99,7 +99,9 @@ filters:
     companies: []               # matched against company name and slug, whole words
     company_types: [agency, outsource, outstaff]
     domains: [gambling, crypto]
-    title_keywords: ['ai trainer', 'annotation', 'rlhf', 'data labell?ing', 'freelance']
+    title_keywords: ['ai trainer', 'ai training', 'annotation', 'rlhf', 'data labell?ing', 'freelance']
+    # staffing / talent marketplaces and agency-like company names (matched on the company name)
+    company_name_keywords: ['\bagency\b', '\bstaffing\b', '\brecruit\w*', '\btalents?\b', '\boutsourc\w*', '\bturing\b', '\bproxify\b', '\btoptal\b', '\bg2i\b', '\bbraintrust\b', '\bandela\b', '\barc\.dev\b', '\blemon\.io\b', '\bupwork\b', '\bwesource\b', '\bcrossover\b']
     summary_keywords: ['\b(defen[cs]e contractor|military|weapons?|munitions)\b', '\b(adult|porn)\b']
 
   non_english: flag             # keep but tag
@@ -114,7 +116,9 @@ rules:
     # Places that are not a restriction ("authorized to work in the country where you reside").
     neutral_place: '\b(country (where|in which|of residence)|your (country|location|home)|where you (live|reside|are)|which you reside|the country you)\b'
     # Sentences about a work-from-anywhere *perk* never count as eligibility evidence.
-    perk: '\b(?:per year|a year|each year|per annum|weeks? (?:a|per|each)|days (?:a|per|each) year|workation|work from anywhere (?:policy|program|weeks?))\b'
+    perk: '\b(?:per year|a year|each year|per annum|weeks? (?:a|per|each)|days (?:a|per|each) year|workation|work from anywhere (?:policy|program|weeks?)|for up to \d+\s+(?:weeks?|months?|days))\b'
+    # Legal boilerplate is never location evidence ("no lie detector tests to applicants in any location").
+    ignore_sentence: '\b(?:lie detector|polygraph|equal (?:employment )?opportunity|discriminat\w*|pay transparency|privacy (?:notice|policy)|ccpa|gdpr|e-verify|reasonable accommodation|background check)\b'
     timezone_place: '\b(time ?zones?|utc|gmt|est|pst|cet|eastern|pacific|central) '
     lock:
       must_reside: '\b(?:must|need to|needs to|required to|should|have to|has to|will need to)\s+(?:currently\s+)?(?:be\s+)?(?:physically\s+)?(?:located|based|residing|reside|live|living|a\s+(?:legal\s+)?resident)\s+(?:in|within|of)\s+(?P<place>[^.;:\n]{2,160})'
@@ -133,17 +137,20 @@ rules:
       following_places: '\b(?:work|working|reside|located|live|hire|hiring|remote)\b[^.;\n]{0,40}?(?P<place>(?:in\s+)?(?:one of\s+)?(?:the\s+)?following\s+(?:states|countries|locations|regions|cities)[^.\n]{0,200})'
       entity_countries: '(?P<place>\b(?:one of our\s+|countries where we have (?:a |an )?(?:legal )?|locations where we have (?:a |an )?)entit(?:y|ies)\b[^.\n]{0,200})'
     positive:
-      # not when it's a perk ("anywhere in the world for up to 4 weeks a year")
-      anywhere: '\b(?:work|working|live|living|based|remote(?:ly)?|hire|hiring|located)\b[^.;\n]{0,30}\banywhere\b(?:\s+in\s+the\s+world)?(?!\s+(?:in|within|across|inside)\s+(?:the\s+)?(?!world\b)\w)(?![^.;\n]{0,40}\b(?:per year|a year|each year|weeks?|days|months?)\b)'
-      worldwide: '\b(?:remote|hire|hiring|recruit\w*|position|role|job|open|candidates|applicants|location)\b[^.;\n]{0,25}\b(?:worldwide|world-wide|globally|from any country|in any country|any location|any time ?zone)\b'
+      anywhere_world: '\banywhere\s+in\s+the\s+world\b'
+      worldwide: '\b(?:remote|hire|hiring|recruit\w*|position|role|job|open|candidates|applicants|location)\b[^.;\n]{0,25}\b(?:worldwide|world-wide|globally(?!\s+distributed)|from any country|in any country(?!\s+where)|any location|any time ?zone)\b'
       remote_global_label: '\bremote\s*[(\-–:/|]\s*(?:worldwide|global|anywhere)\b'
       candidate_country: '\bbangladesh\b'
     # Restrictive-sounding but not conclusive (often just a label): sent to the AI.
     weak_lock:
       location_line: '^\W*(?:preferred\s+)?(?:candidate\s+)?(?:job\s+)?locations?(?:\(s\))?\s*[:\-–]\s*(?P<place>[^\n]{2,80})$'
+      remote_paren: '\bremote\s*[(\[]\s*(?P<place>[^)\]\n]{2,60})[)\]]'
       pin_line: '^\W*📍\s*(?P<place>[^\n]{2,80})$'
     # Positive but not conclusive: sent to the AI.
     weak_positive:
+      # a bare "work from anywhere" is often a perk-list line for a single-country company
+      anywhere: '\b(?:work|working|live|living|based|remote(?:ly)?|hire|hiring|located)\b[^.;\n]{0,30}\banywhere\b(?!\s+(?:in|within|across|inside)\s+(?:the\s+)?\w)'
+      entity_any_country: '\bany country where (?:we|the company) (?:have|has)\b'
       eor: '\b(?:via|through|using|with|on)\s+(?:deel|remote\.com|oyster|rippling|papaya global|velocity global|multiplier|globalization partners)\b'
       distributed: '\b(?:fully|globally|truly)\s+distributed\b'
       many_countries: '\b(?:in|across|from)\s+\d{2,3}\+?\s+countries\b'

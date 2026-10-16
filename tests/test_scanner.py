@@ -91,6 +91,15 @@ def test_stack_rules(filters):
     assert "no-language-named" in language_agnostic.tags
 
 
+def test_staffing_company_names_dropped(filters):
+    assert filters.evaluate(make_job(company="Come Back Agency", company_key="come-back-agency")).startswith("staffing")
+    assert filters.evaluate(make_job(company="Turing", company_key="turing")).startswith("staffing")
+
+
+def test_country_suffix_is_same_job():
+    assert fingerprint("acme", "Principal Backend Engineer (United States)") == fingerprint("acme", "Principal Backend Engineer")
+
+
 def test_excluded_company_and_age_and_salary(filters):
     assert filters.evaluate(make_job(company="Globex", company_key="globex")).startswith("excluded company")
     assert filters.evaluate(make_job(first_seen_at=NOW - timedelta(days=30))).startswith("older than")
@@ -156,6 +165,15 @@ def location_rules(cfg):
         ("We hire through Deel.", "ambiguous"),
         ("Location: Europe", "ambiguous"),
         ("Must be located in the US. Work from anywhere in the world!", "ambiguous"),
+        # weaknesses found in the first real report
+        ("* Work anywhere in the world for up to 3 months!", "silent"),
+        ("We can hire people in any country where we have a legal entity.", "ambiguous"),
+        ("We do not administer lie detector tests to applicants in any location.", "silent"),
+        ("Location: can be based anywhere in Europe / EU Timezone", "locked"),
+        ("This role is remote (Europe or USA) with overlap with EST timezone.", "ambiguous"),
+        ("Remote-first and flexible: work from anywhere, at your own pace.", "ambiguous"),
+        ("We're a fully remote, globally distributed team.", "ambiguous"),
+        ("You must be located in a US time zone.", "timezone"),
     ],
 )
 def test_location_rules(location_rules, text, outcome):

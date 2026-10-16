@@ -112,7 +112,7 @@ def reason_bucket(reason: str) -> str:
         return reason.split(":")[0]
     for prefix in ("older than", "title excluded", "gig/excluded title", "no Python", "salary max",
                    "already reported", "lower seniority", "excluded company", "excluded domain",
-                   "excluded industry", "company type", "employment type", "not seen live",
+                   "excluded industry", "company type", "employment type", "not seen live", "staffing/agency company",
                    "us_work_authorization", "security_clearance", "w2_only"):
         if reason.startswith(prefix):
             return prefix
