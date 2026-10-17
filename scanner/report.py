@@ -119,6 +119,7 @@ def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, dro
         f"Rules decided most; {stats['ambiguous']} had unclear location wording "
         f"({stats['llm_calls']} AI requests).\n"
     )
+    lines.append(f"Apply evidence guard: **{stats.get('apply_evidence_demotions', 0)}** demoted to Check.\n")
 
     picks = sorted(apply, key=_sort_key) + check[:max(0, start_here_limit - len(apply))]
     lines.append("Mark a job in its table: `[a]` applied, `[g]` good, `[x]` not eligible, "
@@ -137,7 +138,7 @@ def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, dro
     else:
         lines.append("_No new jobs._")
     lines.append(f"\n## ✅ Apply ({len(apply)})\n")
-    lines.append(f"The posting's own text says someone in {country} can be hired, or only asks for timezone overlap.\n")
+    lines.append(f"A strong description quote or employer ATS location supports hiring someone in {country}.\n")
     lines += _table(apply, with_why=False) if apply else ["_None today._"]
 
     lines.append(f"\n## 🟡 Check ({len(check)})\n")

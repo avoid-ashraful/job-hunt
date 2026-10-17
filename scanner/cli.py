@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from scanner.applications import Applications, STATUSES
+from scanner.apply_evidence import ApplyEvidence
 from scanner.marks import sync as sync_marks
 from scanner.companies import load_region_map
 from scanner.company_profile import CompanyProfiles
@@ -268,13 +269,21 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     # 7. buckets: clear eligibility + good fit = Apply; everything else kept = Check
     min_fit = cfg["rules"]["role"].get("min_fit_for_apply", 3)
+    apply_evidence = ApplyEvidence(cfg["rules"].get("apply_evidence", {}))
+    evidence_demotions = 0
     for job in eligible:
         ghost_score, signals = job.screen["ghost"]
         if ghost_score >= ghosts.flag_at:
             job.bucket = "check"
             job.screen["why"] = "eligible, but may be a ghost posting"
         elif job.screen["fit"] >= min_fit:
-            job.bucket = "apply"
+            if reason := apply_evidence.weak_reason(job):
+                job.bucket = "check"
+                job.screen["why"] = f"eligible, but evidence is weak: {reason}"
+                evidence_demotions += 1
+                store.log_decision(today, job.id, "apply_evidence", "weak_evidence", "check", job.screen["why"])
+            else:
+                job.bucket = "apply"
         else:
             job.bucket = "check"
             job.screen["why"] = f"eligible, but low stack fit ({job.screen['fit_why']})"
@@ -329,7 +338,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     drop_counts = Counter(reason_bucket(r) for _, r in dropped)
     stats = {"fetched": len(fetched), "passed": len(passed), "ambiguous": len(ambiguous),
-             "llm_calls": screener.calls if screener else 0, "sources": source_stats}
+             "llm_calls": screener.calls if screener else 0, "sources": source_stats,
+             "apply_evidence_demotions": evidence_demotions}
     tiers = Counter(j.bucket for j in kept)
     pay_tiers = levels_tiers(ROOT / cfg["output"]["state_dir"] / "levels")
     allow = set(market_cfg.get("allow_hq_countries", DEFAULT_ALLOW))
@@ -341,6 +351,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
              len(fetched), len(passed), len(ambiguous), len(kept), tiers["apply"], tiers["check"], tiers["longshot"])
     for reason, count in drop_counts.most_common():
         log.info("  dropped %5d  %s", count, reason)
+    log.info("Apply evidence guard demoted %s jobs to Check", evidence_demotions)
 
     if dry_run:
         store.commit()  # keep LLM cache and logs; nothing is marked as reported

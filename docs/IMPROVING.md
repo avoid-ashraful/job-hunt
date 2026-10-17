@@ -79,3 +79,5 @@ Tracked seeds can supply `ats` and `board` to validate an exact board without gu
 and `aliases` to accept alternate company names in board ownership checks.
 
 Daily ATS fetches save raw board counts and health in `<state_dir>/watchlist_health/`; weekly builds re-resolve boards after three consecutive 404/410 runs or 28 empty days, retain unresolved companies as inactive for the next build, and `scanner watchlist list` shows health.
+
+Apply now requires strong body evidence or an exact employer ATS global location (`rules.apply_evidence`); weak evidence moves to Check and is counted in report stats, logs and decisions (last-two-report audit: 75% → 100%, 6 retained).
