@@ -315,7 +315,7 @@ def test_audit_safeguards_reach_private_prompts_and_invalidate_cache(tmp_path, m
     assert "A partial country list introduced by 'including'" in system
     old_system = system.split("\n\n## Evidence safeguards")[0]
     old_hash = hashlib.sha256((old_system + json.dumps(eligibility.BATCH_SCHEMA, sort_keys=True)).encode()).hexdigest()[:12]
-    db.execute("INSERT INTO llm_location VALUES (?, ?, ?, ?, ?)",
+    db.execute("INSERT INTO llm_location (job_id, prompt_hash, model, result, created_at) VALUES (?, ?, ?, ?, ?)",
                ("job", old_hash, "test", json.dumps(BASE), "2026-10-16"))
     assert screener._cached(make_job(id="job")) is None
 
@@ -345,6 +345,117 @@ def test_screener_runs_batches_in_threads_and_logs_calls(tmp_path, monkeypatch):
     results = screener.screen(jobs)
     assert len(results) == 7 and len(calls) == 4
     assert store.db.execute("SELECT COUNT(*) FROM llm_calls").fetchone()[0] == 4
+
+
+def test_screener_cache_hit_on_same_content_and_miss_on_changed_snippet(tmp_path, monkeypatch):
+    from scanner import eligibility
+    from scanner.store import Store
+
+    class CountingClient:
+        name = "fake:model"
+
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, user):
+            self.calls += 1
+            refs = [line.split()[2] for line in user.splitlines() if line.startswith("### JOB")]
+            results = []
+            for r in refs:
+                elig = "region_locked" if "US only" in user else "anywhere"
+                results.append({
+                    "job_ref": r,
+                    "eligibility": elig,
+                    "eligibility_evidence": "US only" if elig == "region_locked" else "work from anywhere in the world",
+                    "allowed_locations": "US" if elig == "region_locked" else "worldwide",
+                })
+            return {"results": results}
+
+    store = Store(tmp_path / "cache.sqlite")
+    prompt = tmp_path / "p.md"
+    prompt.write_text("judge location")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    screener = eligibility.Screener({"chain": [{"provider": "gemini", "model": "m"}]}, prompt, store.db)
+    client = CountingClient()
+    screener.clients = [client]
+
+    job = make_job(id="j1", title="Backend Dev", description="Python role.")
+    snippets = ["Work from anywhere in the world."]
+
+    # 1. First screen: cache miss, calls model
+    res1 = screener.screen([(job, snippets)])
+    assert res1["j1"][1] == "fake:model"
+    assert res1["j1"][0]["eligibility"] == "anywhere"
+    assert client.calls == 1
+
+    # Same content -> hit (0 additional LLM calls)
+    res2 = screener.screen([(job, snippets)])
+    assert res2["j1"][1] == "cache"
+    assert res2["j1"][0]["eligibility"] == "anywhere"
+    assert client.calls == 1
+
+    # 2. Changed snippet -> miss and re-screen
+    res3 = screener.screen([(job, ["US only. Must reside in US."])])
+    assert res3["j1"][1] == "fake:model"
+    assert res3["j1"][0]["eligibility"] == "region_locked"
+    assert client.calls == 2
+
+    # Subsequent screen with new snippet -> hit
+    res4 = screener.screen([(job, ["US only. Must reside in US."])])
+    assert res4["j1"][1] == "cache"
+    assert res4["j1"][0]["eligibility"] == "region_locked"
+    assert client.calls == 2
+
+
+def test_screener_legacy_cache_row_without_hash_hits_and_stores_hash(tmp_path, monkeypatch):
+    import json
+    import sqlite3
+
+    from scanner import eligibility
+
+    prompt = tmp_path / "p.md"
+    prompt.write_text("judge location")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+
+    # Legacy table without content_hash column
+    db = sqlite3.connect(tmp_path / "legacy.sqlite")
+    db.execute("""
+        CREATE TABLE llm_location (
+            job_id TEXT NOT NULL,
+            prompt_hash TEXT NOT NULL,
+            model TEXT NOT NULL,
+            result TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (job_id, prompt_hash)
+        )
+    """)
+    job = make_job(id="legacy:1", title="Python Engineer")
+    snippets = ["Work from anywhere in the world."]
+
+    # Instantiating Screener migrates the table to add content_hash
+    screener = eligibility.Screener({"chain": [{"provider": "gemini", "model": "m"}]}, prompt, db)
+    cols = {r[1] for r in db.execute("PRAGMA table_info(llm_location)")}
+    assert "content_hash" in cols
+
+    # Insert a legacy row with NULL content_hash
+    legacy_res = {"eligibility": "anywhere", "eligibility_evidence": "Work from anywhere in the world.", "allowed_locations": "worldwide"}
+    db.execute(
+        "INSERT INTO llm_location (job_id, prompt_hash, model, result, created_at) VALUES (?, ?, ?, ?, ?)",
+        (job.id, screener.prompt_hash, "gemini:old", json.dumps(legacy_res), "2026-10-16"),
+    )
+    db.commit()
+
+    # Legacy row without hash -> hit, and hash gets stored
+    cached = screener._cached(job, snippets)
+    assert cached == legacy_res
+
+    # Hash is now stored
+    stored_hash = db.execute("SELECT content_hash FROM llm_location WHERE job_id = ?", (job.id,)).fetchone()[0]
+    expected_hash = screener.content_hash(job, snippets)
+    assert stored_hash == expected_hash
+
+    # With the hash stored, changed snippet now misses
+    assert screener._cached(job, ["US only."]) is None
 
 
 def test_json_is_recovered_from_fences_and_prose():
