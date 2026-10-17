@@ -270,6 +270,34 @@ def test_authorization_verdict_requires_body_evidence(evidence, expected):
     assert result["eligibility"] == expected
 
 
+@pytest.mark.parametrize("evidence", [
+    "Location: Remote Japan Japan",
+    "*Location:* Remote - Chile, Peru",
+    "Location(s): Australia : Victoria : Melbourne",
+])
+def test_body_location_headers_are_not_hiring_restrictions(evidence):
+    from scanner.eligibility import check_evidence
+
+    requirement = "Applicants must reside in Japan."
+    job = make_job(description=f"{evidence}\n{requirement}")
+    result = check_evidence(job, {**BASE, "eligibility": "region_locked",
+                                "eligibility_evidence": evidence})
+    assert result["eligibility"] == "unclear"
+    supported = check_evidence(job, {**BASE, "eligibility": "region_locked",
+                                   "eligibility_evidence": requirement})
+    assert supported["eligibility"] == "region_locked"
+
+
+def test_location_header_with_explicit_role_scope_is_evidence():
+    from scanner.eligibility import check_evidence
+
+    evidence = "*Location* : This is a remote role based in the EMEA region."
+    job = make_job(description=evidence)
+    result = check_evidence(job, {**BASE, "eligibility": "region_locked",
+                                "eligibility_evidence": evidence})
+    assert result["eligibility"] == "region_locked"
+
+
 def test_audit_safeguards_reach_private_prompts_and_invalidate_cache(tmp_path, monkeypatch):
     import hashlib
     import json

@@ -109,6 +109,10 @@ def check_evidence(job: Job, r: dict) -> dict:
     from_meta = not ev or ev.startswith(("location tag", "title:", "region tags", "country tags")) or any(
         ev == m or ev in m for m in meta
     )
+    # A copied location header is still a label, even when it appears in the body.
+    location_header = re.match(r"^\W*location(?:\(s\))?[*_\s]*[:\-–]", ev)
+    hiring_statement = re.search(r"\b(?:role|position|candidates?|applicants?|must|hiring|hire)\b", ev)
+    from_meta = from_meta or bool(location_header and not hiring_statement)
     body = _norm(job.description)
     parts = [part.strip(" .,;") for part in re.split(r"\.\.\.|…", ev) if part.strip(" .,;")]
     quoted = bool(parts) and all(part in body for part in parts)
