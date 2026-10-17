@@ -1,0 +1,43 @@
+{
+  "board": "example",
+  "response": {
+    "items": [
+      {
+        "id": "r1",
+        "name": "Backend Engineer",
+        "url": "https://ats.rippling.com/example/jobs/r1",
+        "locations": [
+          {
+            "name": "United States",
+            "workplaceType": "REMOTE"
+          }
+        ]
+      },
+      {
+        "id": "r1",
+        "name": "Backend Engineer",
+        "url": "https://ats.rippling.com/example/jobs/r1",
+        "locations": [
+          {
+            "name": "Canada",
+            "workplaceType": "REMOTE"
+          }
+        ]
+      }
+    ],
+    "totalPages": 1
+  },
+  "detail": {
+    "description": {
+      "company": "<p>Our team</p>",
+      "role": "<p>Build Python &amp; Django services.</p>"
+    },
+    "createdOn": "2026-10-16T12:00:00Z"
+  },
+  "expected": {
+    "id": "rippling:example:r1",
+    "url": "https://ats.rippling.com/example/jobs/r1",
+    "location": "United States, Canada"
+  },
+  "link": "https://ats.rippling.com/example/jobs"
+}

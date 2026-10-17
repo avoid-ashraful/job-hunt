@@ -7,7 +7,7 @@ import re
 import time
 from datetime import datetime, timezone
 from html.parser import HTMLParser
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import requests
 
@@ -76,4 +76,22 @@ def ats_id(url: str, company: str) -> str | None:
         return f"workable:{normalize_company(company)}:{path[-1]}"
     if host == "jobs.smartrecruiters.com" and len(path) >= 2:
         return f"smartrecruiters:{path[0]}:{path[1]}"
+    match = re.fullmatch(r"([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com", host)
+    if match and "job" in path:
+        index = path.index("job")
+        if index and len(path) > index + 2:
+            board = f"{match[1]}|{match[2]}|{path[index - 1]}"
+            return f"workday:{board}:{path[-1]}"
+    if host == "ats.rippling.com" and len(path) >= 3 and path[1] == "jobs":
+        return f"rippling:{path[0]}:{path[2]}"
+    if host.endswith(".applytojob.com") and len(path) >= 2 and path[0] == "apply":
+        return f"jazzhr:{host.split('.')[0]}:{path[1]}"
+    if host.endswith(".homerun.co") and path[0]:
+        return f"homerun:{host.split('.')[0]}:{'/'.join(path)}"
+    if host == "app.dover.com" and len(path) >= 3 and path[0] == "apply":
+        return f"dover:{unquote(path[1])}:{path[2]}"
+    if host in {"www.comeet.com", "comeet.com"} and len(path) >= 5 and path[0] == "jobs":
+        return f"comeet:{path[1]}|{path[2]}:{path[4]}"
+    if re.fullmatch(r"[a-z0-9-]+\.factorial(?:hr)?\.com", host) and len(path) >= 2 and path[0] == "job_posting":
+        return f"factorial:{host.split('.')[0]}:{path[1].rsplit('-', 1)[-1]}"
     return None

@@ -1,0 +1,11 @@
+{
+  "board": "example",
+  "response": "<job-list v-bind=\"{&quot;content&quot;: {&quot;vacancies&quot;: [{&quot;id&quot;: 99, &quot;title&quot;: &quot;Backend Engineer&quot;, &quot;url&quot;: &quot;https://example.homerun.co/backend-engineer&quot;, &quot;location_id&quot;: 1}], &quot;locations&quot;: [{&quot;id&quot;: 1, &quot;name&quot;: &quot;Remote, Global&quot;}]}}\"></job-list>",
+  "detail": "<script type=\"application/ld+json\">{\"@type\": \"JobPosting\", \"title\": \"Backend Engineer\", \"description\": \"<p>Build Python &amp; Django services.</p>\", \"datePosted\": \"2026-10-16T12:00:00Z\"}</script>",
+  "expected": {
+    "id": "homerun:example:backend-engineer",
+    "url": "https://example.homerun.co/backend-engineer",
+    "location": "Remote, Global"
+  },
+  "link": "https://example.homerun.co"
+}

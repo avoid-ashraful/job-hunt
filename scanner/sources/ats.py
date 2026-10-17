@@ -21,6 +21,7 @@ import yaml
 
 from scanner.dedup import normalize_company, normalize_url
 from scanner.models import Job
+from scanner.sources import _more_ats
 
 log = logging.getLogger(__name__)
 USER_AGENT = "job-hunt-scanner (personal use)"
@@ -258,6 +259,8 @@ def _title_ok(title: str, cfg: dict) -> bool:
 
 
 def _base(ats: str, board: str) -> tuple[str, dict]:
+    if ats in _more_ats.NAMES:
+        return _more_ats.base(ats, board)
     slug = quote(board, safe="")
     if ats == "greenhouse":
         return f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs", {"content": "true", "pay_transparency": "true"}
@@ -310,6 +313,9 @@ def _record(raw: dict, company: dict, cfg: dict, session: requests.Session) -> J
         return None
     if ats == "pinpoint" and "youtube.com/embed/https://www.youtube.com/embed/pFxm6fszrpw" in str(raw.get("description", "")):
         return None
+
+    if ats in _more_ats.NAMES:
+        raw = _more_ats.enrich(session, ats, board, raw)
 
     location_raw = raw.get("location") or ""
     if isinstance(location_raw, dict):
@@ -467,7 +473,9 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
     try:
         url, params = _base(ats, board)
         used_fallback = False
-        if ats == "personio":
+        if ats in _more_ats.NAMES:
+            raws = _more_ats.rows(session, ats, board, cfg.get("max_board_jobs", 200))
+        elif ats == "personio":
             try:
                 text = get_text(session, url)
             except requests.HTTPError as exc:

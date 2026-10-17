@@ -1,0 +1,29 @@
+{
+  "board": "example|wd5|External",
+  "response": {
+    "total": 1,
+    "jobPostings": [
+      {
+        "title": "Backend Engineer",
+        "externalPath": "/job/Remote/Backend-Engineer_R1",
+        "locationsText": "2 Locations"
+      }
+    ]
+  },
+  "detail": {
+    "jobPostingInfo": {
+      "jobDescription": "<p>Build Python &amp; Django services.</p>",
+      "startDate": "2026-10-16T12:00:00Z",
+      "location": "US, Remote",
+      "additionalLocations": [
+        "Canada, Remote"
+      ]
+    }
+  },
+  "expected": {
+    "id": "workday:example|wd5|External:Backend-Engineer_R1",
+    "url": "https://example.wd5.myworkdayjobs.com/External/job/Remote/Backend-Engineer_R1",
+    "location": "US, Remote, Canada, Remote"
+  },
+  "link": "https://example.wd5.myworkdayjobs.com/en-US/External"
+}
