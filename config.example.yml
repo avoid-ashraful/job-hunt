@@ -41,7 +41,7 @@ sources:
       countries:
         bd: '\b(bangladesh)\b'
         in: '\b(india)\b'
-        us: '\b(usa|u\.?s\.?a?|united states)\b'
+        us: '\b(usa|u\.?s\.?a?|united[\s-]states)\b'
         ca: '\b(canada)\b'
         gb: '\b(uk|united kingdom|great britain)\b'
         sg: '\b(singapore)\b'

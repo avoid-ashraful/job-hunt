@@ -19,12 +19,15 @@ def test_smartrecruiters_country_code_becomes_a_country(monkeypatch):
     assert "lk" in job.countries
 
 
-@pytest.mark.parametrize("source,countries,expected", [
-    ("ats", ["lk"], "longshot"),   # the employer's own board names another country
-    ("ats", [], "check"),
-    ("freehire", ["lk"], "check"),  # an aggregator's country tag alone stays as before
+@pytest.mark.parametrize("source,countries,regions,expected", [
+    ("ats", ["lk"], [], "longshot"),   # the employer's own board names another country
+    ("ats", [], ["north_america"], "longshot"),  # "Americas Remote"
+    ("ats", [], ["north_america", "apac"], "check"),  # "Americas or APAC"
+    ("ats", [], [], "check"),
+    ("freehire", ["lk"], [], "check"),  # an aggregator's country tag alone stays as before
 ])
-def test_employer_listed_countries_make_a_silent_job_a_long_shot(tmp_path, monkeypatch, source, countries, expected):
+def test_employer_listed_countries_make_a_silent_job_a_long_shot(tmp_path, monkeypatch, source, countries, regions,
+                                                                  expected):
     cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
     cfg["sources"] = {"freehire": {"first_run_days": 3}}
     cfg["output"] = {"jobs_dir": "jobs", "state_dir": "state"}
@@ -36,7 +39,7 @@ def test_employer_listed_countries_make_a_silent_job_a_long_shot(tmp_path, monke
     job = Job(id="smartrecruiters:acme:1", source=source, url="https://jobs.smartrecruiters.com/acme/1",
               title="Senior Python Engineer", company="Acme", company_key="acme",
               description="Build Python Django PostgreSQL Redis services. " * 20, location="Remote",
-              countries=countries, watchlist=source == "ats", first_seen_at=datetime.now(timezone.utc))
+              countries=countries, regions=regions, watchlist=source == "ats", first_seen_at=datetime.now(timezone.utc))
     monkeypatch.setattr(cli.sources, "fetch_all", lambda *args: iter([job]))
     monkeypatch.setattr(cli.LocationRules, "classify", lambda self, job: Verdict("silent", "silent"))
     cli.run(config, dry_run=False, days=3, skip_llm=True)
