@@ -329,7 +329,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     drop_counts = Counter(reason_bucket(r) for _, r in dropped)
     stats = {"fetched": len(fetched), "passed": len(passed), "ambiguous": len(ambiguous),
-             "llm_calls": screener.calls if screener else 0, "sources": source_stats}
+             "llm_calls": screener.calls if screener else 0, "sources": source_stats,
+             "selftest_failed": int(os.environ.get("SCANNER_SELFTEST_FAILURES", "0"))}
     tiers = Counter(j.bucket for j in kept)
     pay_tiers = levels_tiers(ROOT / cfg["output"]["state_dir"] / "levels")
     allow = set(market_cfg.get("allow_hq_countries", DEFAULT_ALLOW))
@@ -433,9 +434,15 @@ def main() -> None:
     lr.add_argument("--days", type=int, default=7)
     wl = sub.add_parser("watchlist", help="build, grow or list direct ATS company boards")
     wl.add_argument("action", choices=["build", "grow", "list", "seeds"])
+    st = sub.add_parser("selftest", help="run rule regression cases against the active config")
+    st.add_argument("--config", type=Path, default=argparse.SUPPRESS)
+    st.add_argument("--failure-count-file", type=Path, help="write the failure count for the daily report")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    if args.cmd == "selftest":
+        from scanner.selftest import run as selftest
+        raise SystemExit(1 if selftest(args.config, args.failure_count_file) else 0)
     if args.cmd == "run":
         run(args.config, args.dry_run, args.days, args.skip_llm)
     elif args.cmd == "feedback":

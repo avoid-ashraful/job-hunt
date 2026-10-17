@@ -79,3 +79,36 @@ Tracked seeds can supply `ats` and `board` to validate an exact board without gu
 and `aliases` to accept alternate company names in board ownership checks.
 
 Daily ATS fetches save raw board counts and health in `<state_dir>/watchlist_health/`; weekly builds re-resolve boards after three consecutive 404/410 runs or 28 empty days, retain unresolved companies as inactive for the next build, and `scanner watchlist list` shows health.
+
+## Checking the active rules
+
+Run `uv run python -m scanner selftest` to check the private config, or
+`uv run python -m scanner selftest --config config.example.yml` to check the example.
+The command reads config without fetching jobs, calling the AI, or opening scanner state.
+It prints each mismatch and a pass/fail total, and exits non-zero on failure.
+The daily script logs these results before scanning and carries the failure count into
+the report footer; failing cases do not stop the scan.
+
+Add regression cases to `tests/cases/rules.yml`; pytest runs the same corpus against
+`config.example.yml`. Keep case names unique and use real posting text, for example:
+
+```yaml
+- name: residence-us-only
+  stage: location
+  job:
+    title: Senior Python Engineer
+    description: Candidates must reside in the United States.
+  expected:
+    outcome: locked
+    rule: lock.must_reside
+```
+
+`stage` is `location` (locked/positive/timezone/ambiguous/silent), `role` or `filter`
+(keep/drop), or `fit` (numeric score). `job` accepts Job fields, including `location`,
+`watchlist`, and `posting_language`; defaults are a Senior Backend Engineer at Example
+using Python and Django, with no age or salary. Filters annotate the family before
+role and fit checks, as in the daily run; each case asserts only its selected stage.
+`expected.rule` is optional: location/role use rule IDs, filters use the drop reason
+category (for example `no Python`), and fit uses the score explanation. Filter cases
+may also assert `expected.family`. Run pytest and selftest against both configs after
+adding a case; investigate active-config mismatches before changing expectations.
