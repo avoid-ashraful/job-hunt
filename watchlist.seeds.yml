@@ -61,3 +61,193 @@ companies:
     board: veeva
     aliases: [Veeva]
     why: Work Anywhere policy; check each posting for eligible locations
+  # Backlog 29 (2026-10-17): boards verified live; why cites a current posting or careers page.
+  - company: Metabase
+    website: https://www.metabase.com
+    ats: lever
+    board: metabase
+    hq_country: us
+    why: '"Global Remote" postings, "Fully remote, any timezone"; team in 30 countries: https://jobs.lever.co/metabase/ee8203b5-2cf7-4eae-afd6-3f9724761ad9'
+  - company: VRChat
+    website: https://hello.vrchat.com
+    ats: lever
+    board: vrchat
+    hq_country: us
+    why: 'Postings located "Anywhere", "100% Remote - work from anywhere in the world": https://jobs.lever.co/vrchat/e9aecc1d-9e3f-4232-95ea-01fff6dfe222'
+  - company: Weaviate
+    website: https://weaviate.io
+    ats: ashby
+    board: weaviate
+    hq_country: nl
+    why: '"Our team members work remotely across the globe with the flexibility to work from anywhere": https://jobs.ashbyhq.com/weaviate/10c5e3e9-26eb-48d1-ab5a-d9ffb6ab432b'
+  - company: Spacelift
+    website: https://spacelift.io
+    ats: teamtailor
+    board: spacelift
+    why: '"Work from anywhere! We are a full-remote company": https://careers.spacelift.io/jobs/8198297-vp-post-sales'
+  - company: Chili Piper
+    website: https://www.chilipiper.com
+    ats: ashby
+    board: chilipiper
+    hq_country: us
+    why: '"We are a fully remote, global team": https://jobs.ashbyhq.com/chilipiper/393da904-c000-498c-a197-13c37ff41ee9'
+  - company: bunny.net
+    website: https://bunny.net
+    ats: teamtailor
+    board: bunnynet
+    hq_country: si
+    why: '"Remote-first by design - No offices ... the freedom to work anywhere": https://bunnynet.teamtailor.com/jobs/8333016-lead-product-engineer-developer-platform'
+  - company: PlanetScale
+    website: https://planetscale.com
+    ats: greenhouse
+    board: planetscale
+    hq_country: us
+    why: 'Engineering postings open to "Remote - NA, APAC, EMEA": https://job-boards.greenhouse.io/planetscale/jobs/4009926009'
+  - company: LanceDB
+    website: https://lancedb.com
+    ats: ashby
+    board: lancedb
+    hq_country: us
+    why: 'Senior Software Engineer located "Americas or APAC": https://jobs.ashbyhq.com/lancedb/3a984b21-7b04-44c8-b8be-471526dc66e0'
+  - company: Osome
+    website: https://osome.com
+    ats: teamtailor
+    board: osome
+    hq_country: sg
+    why: 'Remote roles "open to candidates based anywhere in Asia": https://careers.osome.com/jobs/8256917-creative-manager'
+  - company: TigerData
+    website: https://www.tigerdata.com
+    ats: ashby
+    board: tigerdata
+    hq_country: us
+    aliases: [Timescale]
+    why: '"Globally distributed, remote-first ... Fully remote opportunities globally"; APAC-hours roles: https://jobs.ashbyhq.com/tigerdata/e6223d80-1f6e-44ae-a9c8-160cfd368049'
+  - company: StackBlitz
+    website: https://stackblitz.com
+    ats: greenhouse
+    board: stackblitz
+    hq_country: us
+    why: '"Fully remote team, globally distributed ... You do not need to be located in the U.S.": https://job-boards.greenhouse.io/stackblitz/jobs/4006004009'
+  - company: Flex
+    website: https://getflex.com
+    ats: greenhouse
+    board: flex
+    hq_country: us
+    why: 'NYC fintech; Senior Software Engineer, Backend located "Remote - Global": https://job-boards.greenhouse.io/flex/jobs/4732764005'
+  - company: Inferact
+    website: https://inferact.ai
+    ats: ashby
+    board: inferact
+    hq_country: us
+    why: 'vLLM company; "Location: Fully remote, worldwide": https://jobs.ashbyhq.com/inferact/ef7198da-ad0a-4c02-963f-6250a15e3534'
+  - company: Colonist
+    website: https://colonist.io
+    ats: ashby
+    board: colonist
+    why: 'Postings located "Any Location"; "fully remote, asynchronous team spread across multiple continents": https://jobs.ashbyhq.com/colonist/435458c1-22bf-44cc-83a8-51ca6f5319f3'
+  - company: Mode Mobile
+    website: https://www.modemobile.com
+    ats: greenhouse
+    board: modemobile
+    why: '"We are a 100% remote-first, global company": https://www.modemobile.com/open-role?gh_jid=8812005002'
+  - company: Kit
+    website: https://kit.com
+    ats: ashby
+    board: kit
+    hq_country: us
+    aliases: [ConvertKit]
+    why: '"100% remote with team members across the globe": https://jobs.ashbyhq.com/kit/64e002a3-ef82-45bf-a9f5-fbdb945c7326'
+  - company: Flodesk
+    website: https://flodesk.com
+    ats: greenhouse
+    board: flodesk
+    hq_country: us
+    why: '"Remote-first company headquartered in San Francisco with a globally distributed team" incl. a Da Nang hub: https://job-boards.greenhouse.io/flodesk/jobs/5432437008'
+  - company: Miris
+    website: https://miris.com
+    ats: greenhouse
+    board: miris
+    hq_country: us
+    why: '"Remote-first company with a globally distributed team"; benefits vary by location: https://job-boards.greenhouse.io/miris/jobs/4400541009'
+  - company: Smallstep
+    website: https://smallstep.com
+    ats: ashby
+    board: smallstep
+    why: '"Smallstep is an internationally distributed, remote-first company": https://jobs.ashbyhq.com/smallstep/81bd80bd-d0c3-4b03-9fca-2580a7b2e396'
+  - company: ClassDojo
+    website: https://www.classdojo.com
+    ats: ashby
+    board: classdojo
+    hq_country: us
+    why: '"We hire regardless of location" (needs overlap with an Americas time zone): https://jobs.ashbyhq.com/classdojo/f17c9f24-3877-40c7-bf28-1d16c3267d2d'
+  - company: Tarteel
+    website: https://tarteel.ai
+    ats: rippling
+    board: tarteel
+    why: '"Fully remote work - Work anytime, anywhere" on engineering postings: https://ats.rippling.com/tarteel/jobs/059f510d-63ca-42af-a19a-446064af52ef'
+  - company: a2z Radiology AI
+    website: https://www.a2zradiology.ai
+    ats: ashby
+    board: a2zradiology
+    why: '"Remote (International)"; "Open to candidates worldwide", local-market pay, no visa: https://jobs.ashbyhq.com/a2zradiology/fb1c1cbf-4b0a-465c-aa27-0a61c3c6ab71'
+  - company: Open Home Foundation
+    website: https://www.openhomefoundation.org
+    ats: ashby
+    board: openhomefoundation
+    hq_country: ch
+    why: 'Home Assistant org; "fully remote organization that uses Remote to employ people from all over the world": https://jobs.ashbyhq.com/openhomefoundation/9e9d1ec8-4c49-46f4-8fb3-78394de501ac'
+  - company: HighLevel
+    website: https://www.gohighlevel.com
+    ats: lever
+    board: gohighlevel
+    hq_country: us
+    aliases: [GoHighLevel]
+    why: '"Remote-First: Work from anywhere"; 2,000 staff in 10+ countries, many South Asia roles: https://jobs.lever.co/gohighlevel/ce928065-f2cf-4412-a5e7-32677e6f4e4b'
+  - company: Laravel
+    website: https://laravel.com
+    careers_url: https://laravel.com/careers
+    hq_country: us
+    why: 'Remote-first; Workable board (laravel) lists EMEA and APAC engineering roles: https://laravel.com/careers'
+  - company: Awesome Motive
+    website: https://awesomemotive.com
+    careers_url: https://awesomemotive.com/careers/
+    why: '"Join Our Remote Team and Work From Anywhere"; 300+ people in 50 countries (Workable board): https://awesomemotive.com/careers/'
+  - company: RemoFirst
+    website: https://www.remofirst.com
+    careers_url: https://www.remofirst.com/careers
+    why: 'EOR platform; "Our team works remotely anywhere in the world" (Workable board): https://www.remofirst.com/careers'
+  - company: Deepgram
+    website: https://deepgram.com
+    ats: ashby
+    board: Deepgram
+    hq_country: us
+    why: 'Posts "APAC - Remote" roles alongside US/EU remote: https://jobs.ashbyhq.com/Deepgram/d28f0a61-4a59-4817-b101-3457077b01b7'
+  - company: Clerk
+    website: https://clerk.com
+    ats: ashby
+    board: Clerk
+    hq_country: us
+    why: '"Globally distributed team", all-remote, holidays per "country of residence": https://jobs.ashbyhq.com/Clerk/36597279-a42d-401c-88aa-153cc1a64f35'
+  - company: All Hands AI
+    website: https://www.all-hands.dev
+    ats: ashby
+    board: OpenHands
+    aliases: [OpenHands]
+    why: 'Remote-first, core hours "12-4pm ET | 4-8pm UTC" across countries: https://jobs.ashbyhq.com/OpenHands/80bfc775-3197-407d-8742-ccb5ddae8709'
+  - company: Jibble
+    website: https://www.jibble.io
+    ats: breezy
+    board: jibble-group
+    aliases: [Jibble Group]
+    why: '100% remote; Senior Back-End Developer located "Worldwide, Remote": https://jibble-group.breezy.hr/p/01cdf9b02a0d01-senior-back-end-developer'
+  - company: Circle.so
+    website: https://circle.so
+    ats: ashby
+    board: circle
+    why: 'Engineering postings located "Anywhere"; "fully remote company ... from 30+ countries": https://jobs.ashbyhq.com/circle/cb085d54-568c-46b3-829f-b18885c6cda2'
+  - company: SafetyWing
+    website: https://safetywing.com
+    ats: pinpoint
+    board: safetywing
+    hq_country: us
+    why: 'Nomad-insurance company; "fully remote and distributed stretching ten timezones, while headquartered in San Francisco": https://safetywing.pinpointhq.com/'
