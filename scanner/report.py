@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -27,9 +28,15 @@ def _salary(job: Job) -> str:
     return f"{lo}–{hi} {job.salary_currency}/{job.salary_period or 'year'}"
 
 
+def _pay_k(job: Job) -> int:
+    """Top of the USD pay hint ("$150–190k/yr" → 190); 0 when unknown."""
+    numbers = re.findall(r"\d+", (job.screen or {}).get("pay_hint") or "")
+    return int(numbers[-1]) if numbers else 0
+
+
 def _sort_key(job: Job):
     fit = (job.screen or {}).get("fit", 0)
-    return (not (job.screen or {}).get("preferred_hq"), -fit, "global" not in job.regions,
+    return (not (job.screen or {}).get("preferred_hq"), -fit, -_pay_k(job), "global" not in job.regions,
             -(job.age_anchor.timestamp() if job.age_anchor else 0))
 
 

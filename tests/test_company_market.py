@@ -113,3 +113,14 @@ def test_pay_hint_and_sort(tmp_path: Path):
     other = job(company="Other")
     other.screen = {"fit": 5, "preferred_hq": False}
     assert _sort_key(paid) < _sort_key(other)
+
+
+def test_better_paid_job_sorts_first_at_equal_fit():
+    from scanner.report import _sort_key
+
+    def job(i, hint):
+        return Job(id=i, source="ats", url="", title="t", company="c", company_key="c", description="",
+                   screen={"fit": 4, "preferred_hq": True, "pay_hint": hint})
+
+    jobs = [job("low", "$90–120k/yr"), job("none", ""), job("high", "$160–210k/yr")]
+    assert [j.id for j in sorted(jobs, key=_sort_key)] == ["high", "low", "none"]
