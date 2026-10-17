@@ -1,5 +1,11 @@
 """Public source normalization and eligibility clues without network calls."""
 
+import json
+from pathlib import Path
+
+import pytest
+import yaml
+
 from scanner.sources._public import ats_id
 from scanner.sources.himalayas import to_job as himalayas_job
 from scanner.sources.hn import _comment_job
@@ -42,7 +48,7 @@ def test_hn_comment_uses_ats_id_when_present():
     }
     raw = {
         "objectID": "123", "created_at": "2026-10-01T00:00:00Z",
-        "comment_text": "Acme | Senior Backend Engineer | REMOTE worldwide<br>Python/Django. https://jobs.lever.co/acme/1234",
+        "comment_text": "Acme | Senior Backend Engineer | REMOTE worldwide<br>Python/Django. <a href=\"https:&#x2F;&#x2F;jobs.lever.co&#x2F;acme&#x2F;1234\">https:&#x2F;&#x2F;jobs.lever.co&#x2F;acme&#x2F;1...</a>",
     }
     job = _comment_job(raw, cfg)
     assert job and job.id == "lever:acme:1234"
@@ -53,3 +59,17 @@ def test_hn_comment_uses_ats_id_when_present():
 
 def test_ats_id_recognizes_public_greenhouse_host():
     assert ats_id("https://job-boards.greenhouse.io/acme/jobs/123", "Acme") == "greenhouse:acme:123"
+
+
+_HN_CASES = json.loads((Path(__file__).parent / "fixtures/hn/comments.json").read_text())
+
+
+@pytest.mark.parametrize("case", _HN_CASES, ids=[c["name"] for c in _HN_CASES])
+def test_hn_comment_parsing(case):
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())["sources"]["hn"]
+    raw = {"objectID": "1", "created_at": "2026-10-01T00:00:00Z", "comment_text": case["comment_text"]}
+    job = _comment_job(raw, cfg)
+    if case["expect"] is None:
+        assert job is None
+        return
+    assert job and {k: getattr(job, k) for k in case["expect"]} == case["expect"]
