@@ -11,8 +11,12 @@ candidate:
   company_priors: vendor/remote-jobs/src/companies   # remoteintech: companies that hire worldwide
   resume: private/profile/resume.pdf
 
+run:
+  fetch_budget_minutes: 10     # soft limit: skip unstarted sources; active sources finish
+  fetch_workers: 4             # concurrent sources; results still use config priority
+
 sources:
-  # Sources run in this order; when two return the same job id, the first copy wins.
+  # Sources yield in this order; when two return the same job id, the first copy wins.
   ats:
     enabled: true
     # Live public ATS boards are checked before freehire; first ID wins.

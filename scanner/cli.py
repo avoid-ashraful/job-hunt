@@ -142,7 +142,10 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     watched_keys = {watchlist.normalize_company(c["company"]) for c in watched}
     watched_boards = {(c.get("ats"), c.get("board")) for c in watched}
     source_stats = []
-    for job in sources.fetch_all(source_cfg, days, source_stats):
+    run_cfg = cfg.get("run", {})
+    for job in sources.fetch_all(source_cfg, days, source_stats,
+                                 run_cfg.get("fetch_budget_minutes", 10),
+                                 run_cfg.get("fetch_workers", 4)):
         if job.company_key in watched_keys or tuple(job.id.split(":", 2)[:2]) in watched_boards:
             job.watchlist = True
         if (have := fetched.get(job.id)) is None:

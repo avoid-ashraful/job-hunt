@@ -19,5 +19,17 @@ Highest priority first. Each item names its owner once picked up; agents work on
 | 13 | Weekly cron refreshes seed lists (`watchlist seeds`) before the rebuild | new companies arrive without manual runs | done 2026-10-17 |
 | 14 | Duplicate audit after adding 4 remote boards: same job via RemoteOK/WWR/Jobicy and the employer ATS must be reported once, with the ATS copy winning | boards re-post ATS jobs | open |
 | 15 | AI-decision audit: sample LLM eligibility verdicts and their quoted evidence from the decisions/llm_calls tables; measure wrong "eligible"/"locked" calls and fix prompts or rules | AI is the least predictable step | done (Codex, merged): LLM 57% / rules 83% correct on sample; prompt safeguards + 4 rule fixes; see docs/audits/2026-10-17-ai-decisions.md |
-| 16 | Daily run budget: measure end-to-end time with all sources; keep it under ~15 min (parallel fetch per source, cap detail fetches) | more sources = slower run | open |
+| 16 | Daily run budget: measure end-to-end time with all sources; keep it under ~15 min (parallel fetch per source, cap detail fetches) | more sources = slower run | done (t3/parallelize-daily-fetch): sequential estimate 211s → live concurrent 147s without LLM; fetch 160s → 99s; 10-minute soft fetch budget |
 | 17 | HQ for freehire jobs: use freehire company data / website / ATS behind the URL to fill unknown HQ | 24 of 25 unknown-HQ report jobs came from freehire | done (Codex, merged): freehire company hq_country/website; unknown 21/35 → 18/35 |
+
+### Item 16 timing (2026-10-17)
+
+Measured live with a copy of the private config and the authorized 155-entry ATS watchlist in `/tmp/job-hunt-budget`; output, state and board health also stayed under `/tmp`. Used `days=1`, first-run backfill 1 day, `--dry-run --skip-llm`, fresh state, and the existing source request limits/pacing. LLM time is excluded.
+
+Sequential source timings: ATS 84.5s (476 jobs), Freehire 24.2s (1,027), HN 20.8s (57), Himalayas 11.2s (30), Workable 14.0s (0), RemoteOK 0.8s (0), WWR 1.9s (2), Working Nomads 2.7s (0), Jobicy 0.2s (12). ATS was measured separately after watchlist read permission arrived; its initial example-board measurement was discarded. Workable's ATS host returned the expected ~12-hour quota block and failed fast.
+
+The original post-fetch dry run exposed a Workday HQ URL `KeyError: tenant`; fixed it using the existing board URL helper. Replaying the captured source jobs after that fix took 51.2s for post-fetch stages (19.7s liveness, 19.5s HQ, 12.0s other), giving a reconstructed sequential total of 211.4s (160.2s fetching + 51.2s post-fetch).
+
+Fetching now uses four concurrent sources, yields in config order to retain first-source dedup priority, and preserves partial results and source health stats. `run.fetch_budget_minutes` defaults to 10: queued sources starting after the deadline are skipped with a warning in the footer; active sources finish normally. Liveness and HQ already used bounded pools (8 and 5), so those pools and per-host ATS pacing are unchanged.
+
+The live concurrent dry run finished in **146.8s** (99.1s fetching, 18.9s liveness, 18.5s HQ, 10.3s other), about **31% faster** than the reconstructed sequential total. Per-source concurrent durations: ATS 99.1s, Freehire 31.1s, HN 10.2s, Himalayas 8.2s, Workable 14.1s, RemoteOK 1.0s, WWR 2.5s, Working Nomads 2.4s, Jobicy 0.2s. Requests and job counts vary between live samples; these are measurements, not a guaranteed upper bound. No sources hit the fetch budget in this sample. `uv run pytest -q`: **389 passed**, including concurrent priority/partial results, queued budget skips, footer warning and Workday HQ regression coverage.
