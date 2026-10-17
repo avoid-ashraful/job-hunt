@@ -17,6 +17,7 @@ def clock(monkeypatch):
     now = [1000.0]
     monkeypatch.setattr(ats, "_NEXT_REQUEST", {})
     monkeypatch.setattr(ats, "_BACKOFF", {})
+    monkeypatch.setattr(ats, "_BLOCKED", {})
     monkeypatch.setattr(ats.time, "monotonic", lambda: now[0])
     monkeypatch.setattr(ats.time, "sleep", lambda seconds: now.__setitem__(0, now[0] + seconds))
     return now
@@ -389,3 +390,23 @@ def test_5xx_retains_retry_after_handling(header, delay, clock):
     session = Session({url: [response(503, headers={"Retry-After": header}), response(data=[])]})
     assert ats.get(session, url, retries=2) == []
     assert clock[0] == 1000 + delay
+
+
+def test_quota_window_fails_fast_instead_of_stalling(clock):
+    widget = "https://apply.workable.com/api/v1/widget/accounts/a"
+    session = Session({widget: [response(429, headers={"Retry-After": "45810"})]})
+    with pytest.raises(requests.HTTPError):
+        ats.get(session, widget, retries=3)
+    assert session.calls == [widget]  # no retry into a 12-hour quota
+    other = "https://apply.workable.com/api/v1/widget/accounts/b"
+    with pytest.raises(requests.HTTPError):
+        ats.get(session, other)
+    assert session.calls == [widget] and clock[0] < 1010
+    search = "https://jobs.workable.com/api/v1/jobs"  # separate service, separate quota
+    session.routes[search] = [response(data={"jobs": []})]
+    ats.get(session, search)
+    assert session.calls[-1] == search
+    clock[0] += 50000
+    session.routes[other] = [response(data={"jobs": []})]
+    ats.get(session, other)
+    assert session.calls[-1] == other

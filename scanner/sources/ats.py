@@ -27,10 +27,15 @@ USER_AGENT = "job-hunt-scanner (personal use)"
 _RATE_LOCK = threading.Lock()
 _NEXT_REQUEST: dict[str, float] = {}
 _BACKOFF: dict[str, float] = {}
+_BLOCKED: dict[str, tuple[float, requests.Response]] = {}
+_MAX_WAIT = 120  # a longer Retry-After is a quota window: fail fast until it ends instead of stalling threads
 
 
 def _host(url: str) -> str:
-    return ".".join((urlparse(url).hostname or "").split(".")[-2:])
+    name = (urlparse(url).hostname or "").lower()
+    if name.endswith("workable.com"):  # apply. and jobs.workable.com have separate quotas
+        return name
+    return ".".join(name.split(".")[-2:])
 
 
 def _pace(url: str) -> None:
@@ -41,7 +46,7 @@ def _pace(url: str) -> None:
             now = time.monotonic()
             wait = _NEXT_REQUEST.get(host, 0) - now
             if wait <= 0:
-                interval = 1.0 if host == "workable.com" else 0.25
+                interval = 1.0 if host.endswith("workable.com") else 0.25
                 _NEXT_REQUEST[host] = now + max(interval, _BACKOFF.get(host, 0))
                 return
         time.sleep(wait)
@@ -61,6 +66,9 @@ def _feedback(url: str, response: requests.Response) -> None:
                         delay = parsedate_to_datetime(retry_after).timestamp() - time.time()
                     except (ValueError, TypeError, OverflowError):
                         pass
+            if delay > _MAX_WAIT:
+                _BLOCKED[host] = (time.monotonic() + delay, response)
+                log.warning("%s asks us to wait %.0fs; skipping it until then", host, delay)
             delay = min(60, max(0, delay))
             _BACKOFF[host] = max(5, delay)
             _NEXT_REQUEST[host] = max(_NEXT_REQUEST.get(host, 0), time.monotonic() + delay)
@@ -75,6 +83,9 @@ def _feedback(url: str, response: requests.Response) -> None:
 def _request(session: requests.Session, url: str, *, params: dict | None = None,
              retries: int = 3, timeout: int = 12) -> requests.Response:
     for attempt in range(retries):
+        blocked = _BLOCKED.get(_host(url))
+        if blocked and blocked[0] > time.monotonic():
+            return blocked[1]
         _pace(url)
         response = session.get(url, params=params, timeout=timeout)
         _feedback(url, response)
