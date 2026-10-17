@@ -112,3 +112,5 @@ role and fit checks, as in the daily run; each case asserts only its selected st
 category (for example `no Python`), and fit uses the score explanation. Filter cases
 may also assert `expected.family`. Run pytest and selftest against both configs after
 adding a case; investigate active-config mismatches before changing expectations.
+
+Apply now requires strong body evidence or an exact employer ATS global location (`rules.apply_evidence`); weak evidence moves to Check and is counted in report stats, logs and decisions (last-two-report audit: 75% → 100%, 6 retained).

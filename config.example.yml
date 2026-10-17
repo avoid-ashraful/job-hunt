@@ -210,6 +210,14 @@ filters:
   non_english: flag             # keep but tag
 
 rules:
+  # Apply requires a matching body quote, or an exact employer ATS location.
+  apply_evidence:
+    patterns:
+      worldwide: '\b(?:worldwide|world-wide|anywhere in the world|any country|all countries)\b'
+      global_hiring: '\b(?:global(?:ly)? hiring|hir(?:e|ing) globally|recruit(?:ing)? globally)\b'
+      candidate_region: '\b(?:remote|hir(?:e|ing)|candidates|applicants|countries|locations)\b[^.;\n]{0,60}\b(?:apac|asia[- ]pacific|south asia|(?<!southeast )(?<!south-east )(?<!east )(?<!central )asia|bangladesh)\b'
+      any_location_candidates: '\bopen to (?:candidates|applicants) from any location\b'
+    ats_location: '^(?:remote[\s,;:()/–-]*)?(?:worldwide|anywhere|global)(?:[\s)]*)$'
   # Deterministic parsers (scanner/rules.py). Every pattern has a name; decisions are logged
   # with "<group>.<name>" so `scanner learn` can report how often each rule fires and how
   # often the AI spot-check agrees with it. Add new rules here; no code change needed.
