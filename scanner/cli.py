@@ -315,6 +315,16 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
                 open_jobs.append(job)
         kept = open_jobs
 
+    profiles.enrich_report(kept)
+    denied_hq = set(market_cfg.get("deny_hq_countries", ["in", "bd"]))
+    report_jobs = []
+    for job in kept:
+        if job.screen.get("hq_country") in denied_hq:
+            drop(job, "filter", "company_market", f"company based in {job.screen['hq_country'].upper()}")
+        else:
+            report_jobs.append(job)
+    kept = report_jobs
+
     drop_counts = Counter(reason_bucket(r) for _, r in dropped)
     stats = {"fetched": len(fetched), "passed": len(passed), "ambiguous": len(ambiguous),
              "llm_calls": screener.calls if screener else 0, "sources": source_stats}

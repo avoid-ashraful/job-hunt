@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,6 +16,9 @@ COUNTRIES = {
     "france": "fr", "netherlands": "nl", "ireland": "ie", "switzerland": "ch",
     "singapore": "sg", "malaysia": "my", "australia": "au", "new zealand": "nz",
     "japan": "jp", "israel": "il", "uae": "ae", "united arab emirates": "ae",
+    "spain": "es", "portugal": "pt", "italy": "it", "poland": "pl", "sweden": "se",
+    "norway": "no", "denmark": "dk", "finland": "fi", "austria": "at", "belgium": "be",
+    "brazil": "br", "vietnam": "vn", "pakistan": "pk", "philippines": "ph",
     "bengaluru": "in", "bangalore": "in", "pune": "in", "hyderabad": "in",
     "noida": "in", "gurugram": "in", "gurgaon": "in", "chennai": "in",
     "mumbai": "in", "kolkata": "in", "ahmedabad": "in", "delhi": "in",
@@ -89,6 +93,28 @@ class CompanyProfiles:
             company_key TEXT PRIMARY KEY, hq_country TEXT, evidence TEXT NOT NULL,
             source TEXT NOT NULL, updated TEXT NOT NULL, strength INTEGER NOT NULL DEFAULT 0)""")
         self.vendor = _vendor_profiles(vendor_dir) if vendor_dir else {}
+        self.attempted: set[str] = set()
+
+    def enrich_report(self, jobs: list[Job]) -> None:
+        """Look up at most 100 still-unknown report companies, once per run."""
+        from scanner.company_evidence import lookup
+
+        unknown = {}
+        for job in jobs:
+            if not self.resolve(job)[0] and job.company_key not in self.attempted:
+                unknown.setdefault(job.company_key, job)
+        pending = [job for job in unknown.values() if not self.resolve(job)[0]][:max(0, 100 - len(self.attempted))]
+        self.attempted.update(job.company_key for job in pending)
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            results = list(pool.map(lookup, pending))
+        for job, (country, evidence) in zip(pending, results):
+            if country:
+                self.db.execute("""UPDATE company_profiles SET hq_country=?, evidence=?, source=?,
+                    updated=?, strength=? WHERE company_key=? AND hq_country IS NULL""",
+                    (country, evidence, "public_company", datetime.now(timezone.utc).isoformat(), 3,
+                     job.company_key))
+        for job in jobs:
+            self.resolve(job)
 
     def resolve(self, job: Job) -> tuple[str | None, str]:
         key = job.company_key

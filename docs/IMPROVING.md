@@ -63,6 +63,8 @@ The weekly script is `scripts/weekly-learn.sh`. Install `0 5 * * 6 /home/ubuntu/
 
 Salary ranges missing from source fields are conservatively parsed from descriptions before filtering; Pay preserves the matched text, while comparisons use configured currency rates and annual multipliers (currencyless ranges are display-only).
 
+Unknown report HQs get public company metadata and website evidence (at most two website pages, five workers, 100 companies/run); positive results persist in SQLite company_profiles, empty results retry next run, and job locations never establish HQ.
+
 ## Watchlist probing
 
 `scanner watchlist build` shares adaptive backoff across each ATS provider after a 429,
