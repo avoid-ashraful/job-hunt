@@ -245,3 +245,13 @@ def test_freehire_url_reuses_ats_company_metadata(monkeypatch):
                                           "location": {"country": "IN"}}})
     assert company_evidence.lookup(posting)[0] == "de"
     assert calls == [endpoint]
+
+
+def test_workday_hq_lookup_uses_board_landing(monkeypatch):
+    calls = network(monkeypatch, {
+        "https://example.wd1.myworkdayjobs.com/Careers": '<a href="https://example.com/">Company</a>',
+        "https://example.com/": '<footer><address>Berlin, Germany</address></footer>',
+    })
+    assert company_evidence.lookup(job(id="workday:example|wd1|Careers:123",
+                                      url="https://example.wd1.myworkdayjobs.com/Careers/job/123"))[0] == "de"
+    assert calls[0] == "https://example.wd1.myworkdayjobs.com/Careers"

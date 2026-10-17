@@ -180,8 +180,15 @@ def lookup(job: Job) -> tuple[str | None, str]:
         landing = job.url
         if identity:
             ats, board, ext = identity
+            if ats == "workday":
+                from scanner.sources._more_ats import landing as board_landing
+                try:
+                    landing = board_landing(ats, board)
+                except ValueError:
+                    pass
+            else:
+                landing = LANDING.get(ats, "").format(b=quote(board, safe="")) or landing
             board = quote(board, safe="")
-            landing = LANDING.get(ats, "").format(b=board) or landing
             endpoint = {
                 "greenhouse": f"https://boards-api.greenhouse.io/v1/boards/{board}",
                 "smartrecruiters": f"https://api.smartrecruiters.com/v1/companies/{board}/postings/{quote(ext, safe='')}",
