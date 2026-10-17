@@ -22,6 +22,23 @@ def _first(patterns: list[re.Pattern], text: str) -> re.Match | None:
     return None
 
 
+# Role separators split a title only when both sides name a role, so "Senior Engineer, Payments" stays whole.
+_ROLE_SEP = re.compile(r"( [|/·] |; |, | & )")
+_ROLE_NOUN = re.compile(r"\b(engineer|developer|architect|programmer|manager|director|designer|scientist|analyst)s?\b", re.I)
+
+
+def _role_segments(title: str) -> list[str]:
+    """Split a multi-role title ("Backend Engineer | Junior Frontend Developer") into one title per role."""
+    parts = _ROLE_SEP.split(title)
+    segments = [parts[0]]
+    for sep, part in zip(parts[1::2], parts[2::2]):
+        if _ROLE_NOUN.search(segments[-1]) and _ROLE_NOUN.search(part):
+            segments.append(part)
+        else:
+            segments[-1] += sep + part
+    return segments
+
+
 class Filters:
     def __init__(self, cfg: dict, seniority_rank: dict[str, int], now: datetime, profiles=None):
         self.now = now
@@ -116,17 +133,25 @@ class Filters:
         return None
 
     def _title(self, job: Job) -> str | None:
-        if m := _first(self.title_exclude, job.title):
+        first = None
+        for segment in _role_segments(job.title):
+            if (reason := self._title_segment(job, segment)) is None:
+                return None
+            first = first or reason
+        return first
+
+    def _title_segment(self, job: Job, title: str) -> str | None:
+        if m := _first(self.title_exclude, title):
             return f"title excluded ('{m.group(0).strip()}')"
-        if m := _first(self.title_keywords, job.title):
+        if m := _first(self.title_keywords, title):
             return f"gig/excluded title ('{m.group(0)}')"
         for name, patterns in self.families.items():
-            if _first(patterns, job.title):
+            if _first(patterns, title):
                 job.family = name
                 break
         else:
             return "title not in target role families"
-        level = seniority_level(job.title, job.seniority)
+        level = seniority_level(title, job.seniority)
         job.rank = self.seniority_rank.get(level, self.seniority_rank.get("unknown", 0))
         if level != "unknown":
             job.tags.append(level)

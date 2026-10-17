@@ -494,3 +494,38 @@
     title: Machine Learning Engineer
   expected:
     outcome: drop
+- name: compound_title-comma-roles-kept
+  stage: filter
+  job:
+    title: Backend Engineers, Sr. Software Engineer (Marketing)
+  expected:
+    outcome: keep
+    family: backend
+- name: compound_title-pipe-roles-kept
+  stage: filter
+  job:
+    title: Senior Python Engineer | Junior Frontend Developer
+  expected:
+    outcome: keep
+    family: python
+- name: compound_title-team-suffix-not-split
+  stage: filter
+  job:
+    title: Senior Engineer, Payments
+  expected:
+    outcome: keep
+    family: generic
+- name: compound_title-manager-team-suffix-dropped
+  stage: filter
+  job:
+    title: Engineering Manager, Backend
+  expected:
+    outcome: drop
+    rule: title excluded
+- name: compound_title-all-roles-excluded-dropped
+  stage: filter
+  job:
+    title: Junior Backend Engineer / Junior Python Developer
+  expected:
+    outcome: drop
+    rule: title excluded
