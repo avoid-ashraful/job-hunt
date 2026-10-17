@@ -502,6 +502,7 @@ def _record(raw: dict, company: dict, cfg: dict, session: requests.Session) -> J
         posted_at=_date(posted_date),
         salary_min=minimum, salary_max=maximum, salary_currency=currency, salary_period=period,
         employment_type=employment, last_seen_at=datetime.now(timezone.utc), watchlist=True,
+        ats_metadata={"company_website": company["website"]} if company.get("website") else {},
     )
     return job
 

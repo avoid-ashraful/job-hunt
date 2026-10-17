@@ -287,3 +287,23 @@ def test_freehire_description_entities_are_decoded():
     raw = json.loads((Path(__file__).parent / "fixtures" / "freehire" / "job.json").read_text())
     raw["description"] = "Location:&#xa;- Remote, Worldwide&#xa;Salary &amp; equity"
     assert to_job(raw).description == "Location:\n- Remote, Worldwide\nSalary & equity"
+
+
+def test_watchlist_website_reaches_hq_lookup_but_job_links_do_not(monkeypatch):
+    import requests
+    from scanner import company_evidence
+    from scanner.sources import ats
+
+    raw = {"id": 1, "title": "Senior Backend Engineer", "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/1",
+           "content": "Python", "location": {"name": "Remote"}}
+    job = ats._record(raw, {"ats": "greenhouse", "board": "acme", "company": "Acme", "website": "https://acme.io"},
+                      {}, requests.Session())
+    assert job.ats_metadata["company_website"] == "https://acme.io"
+    fetched = []
+    monkeypatch.setattr(company_evidence, "_fetch", lambda session, url: fetched.append(url))
+    company_evidence.lookup(job)
+    assert "https://acme.io" in fetched
+    fetched.clear()
+    job.ats_metadata["company_website"] = "https://news.ycombinator.com/item?id=1"
+    company_evidence.lookup(job)
+    assert not any("ycombinator" in u for u in fetched)

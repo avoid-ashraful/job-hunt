@@ -166,13 +166,15 @@ def _company_metadata(data: dict) -> tuple[str | None, str, str]:
 
 
 def lookup(job: Job) -> tuple[str | None, str]:
-    from scanner.board_owner import ATS_DOMAINS, LANDING, _tokens, names_match
+    from scanner.board_owner import AGGREGATORS, ATS_DOMAINS, LANDING, _domain, _tokens, names_match
     from scanner.liveness import _ats_identity
 
     with requests.Session() as session:
         session.headers["User-Agent"] = "job-hunt-scanner (personal use)"
         metadata = job.ats_metadata or {}
         website = metadata.get("company_website") or metadata.get("website") or ""
+        if website and _domain(website).endswith(ATS_DOMAINS + AGGREGATORS):  # a seed's "website" can be a job link
+            website = ""
         identity = _ats_identity(job)
         parts = job.id.split(":", 2)
         if len(parts) == 3 and parts[0] in {"recruitee", "lever_eu", "personio"} and parts[1]:
