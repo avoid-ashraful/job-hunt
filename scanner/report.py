@@ -109,6 +109,14 @@ def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, dro
         lines.append(f"- {count} × {reason}")
     lines.append("\n</details>\n")
 
+    if stats.get("sources"):
+        summaries = []
+        for source in stats["sources"]:
+            status = (f"failed: {_cell(source['error'])} ⚠" if source["error"]
+                      else f"{source['count']}" + (" ⚠" if source["count"] == 0 else ""))
+            summaries.append(f"{source['name']} {status} ({source['seconds']:.0f}s)")
+        lines.append("Sources: " + " · ".join(summaries) + "\n")
+
     with path.open("a") as fh:
         fh.write("\n".join(lines) + "\n")
 

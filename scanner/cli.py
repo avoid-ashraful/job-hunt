@@ -139,7 +139,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     watched = [c for c in watchlist.list_entries(watch_path) if str(c.get("hq_country") or "").lower() not in denied]
     watched_keys = {watchlist.normalize_company(c["company"]) for c in watched}
     watched_boards = {(c.get("ats"), c.get("board")) for c in watched}
-    for job in sources.fetch_all(source_cfg, days):
+    source_stats = []
+    for job in sources.fetch_all(source_cfg, days, source_stats):
         if job.company_key in watched_keys or tuple(job.id.split(":", 2)[:2]) in watched_boards:
             job.watchlist = True
         if (have := fetched.get(job.id)) is None:
@@ -310,7 +311,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     drop_counts = Counter(reason_bucket(r) for _, r in dropped)
     stats = {"fetched": len(fetched), "passed": len(passed), "ambiguous": len(ambiguous),
-             "llm_calls": screener.calls if screener else 0}
+             "llm_calls": screener.calls if screener else 0, "sources": source_stats}
     tiers = Counter(j.bucket for j in kept)
     pay_tiers = levels_tiers(ROOT / cfg["output"]["state_dir"] / "levels")
     allow = set(market_cfg.get("allow_hq_countries", DEFAULT_ALLOW))
@@ -343,7 +344,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         store.log_decision(today, job.id, "report", job.screen.get("decided_by", ""), job.bucket,
                            job.screen.get("why", ""))
     store.log_run(now.isoformat(), len(fetched), len(passed), len(kept), len(kept),
-                  str(report.relative_to(ROOT)), 0)
+                  str(report.relative_to(ROOT)), 0, source_stats)
     store.commit()
     if watch_cfg.get("enabled"):
         stats_grow = watchlist.grow(store.db, watch_path, deny_countries=tuple(denied), cfg=cfg)

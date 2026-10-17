@@ -8,6 +8,6 @@ Highest priority first. Each item names its owner once picked up; agents work on
 | 2 | More ATS adapters with public JSON: Workday (cxs API), Rippling, JazzHR, Homerun, Dover, Comeet, Factorial (only those that work from the VPS) | Big employers (Workday) and small ones are invisible to the watchlist today | Codex |
 | 3 | More worldwide-hiring seed companies (Himalayas company directory, other maintained public lists), ownership-checked like slug guesses | remoteintech gives 403 seeds; the watchlist only has 149 | Codex |
 | 4 | Recall audit: sample jobs dropped by "no Python" / "title not in target role families" / "region locked" and measure false negatives against the user's profile | 863 + 437 drops a day; one bad rule hides good jobs | done 2026-10-17: AI/LLM/agentic engineer, founding engineer, member of technical staff, product engineer added to role families; next: >21-day worldwide Python jobs on live ATS boards |
-| 5 | Run time and failure visibility: per-source timing + counts in the daily log and report footer; alert line when a source returns 0 | silent source failures look like "no jobs" | open |
-| 6 | GitHub Actions CI: `uv run pytest` on push | agent branches get merged by hand | open |
+| 5 | Run time and failure visibility: per-source timing + counts in the daily log and report footer; alert line when a source returns 0 | silent source failures look like "no jobs" | done (branch) |
+| 6 | GitHub Actions CI: `uv run pytest` on push | agent branches get merged by hand | done (branch) |
 | 7 | career-ops as a second source (PLAN stage 3) | redundancy + more remote boards | open |
