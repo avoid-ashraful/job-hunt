@@ -531,4 +531,5 @@ def test_thread_waiting_in_pace_sees_a_new_block(monkeypatch, clock):
 
     monkeypatch.setattr(ats.time, "sleep", sleep)
     session = Session()
-    assert ats._request(session, url) is blocked and session.calls == []
+    got = ats._request(session, url)
+    assert got.status_code == 429 and got.url == url and session.calls == []

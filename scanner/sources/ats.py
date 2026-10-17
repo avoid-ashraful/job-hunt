@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import re
 import threading
@@ -91,7 +92,9 @@ def _request(session: requests.Session, url: str, *, params: dict | None = None,
         _pace(url)
         blocked = _BLOCKED.get(_host(url))
         if blocked and blocked[0] > time.monotonic():
-            return blocked[1]
+            response = copy.copy(blocked[1])
+            response.url = url  # errors should name the request that was skipped
+            return response
         response = getattr(session, method)(url, params=params, timeout=timeout, **kwargs)
         _feedback(url, response)
         if attempt + 1 < retries:
