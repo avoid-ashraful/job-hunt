@@ -174,7 +174,7 @@ filters:
 
   exclude:
     companies: []               # matched against company name and slug, whole words
-    company_types: [agency, outsource, outstaff]
+    company_types: [agency, outsource, outstaff, marketplace, staffing]
     domains: [gambling, crypto]
     title_keywords: ['ai trainer', 'ai training', 'annotation', 'rlhf', 'data labell?ing', 'freelance', 'ai evaluation', 'evaluation expert',
                      'github contributor', '(?:open|general|spontaneous) application', 'talent (?:pool|community|network)', 'future opportunit', 'expression of interest']
