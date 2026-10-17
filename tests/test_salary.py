@@ -50,6 +50,19 @@ def test_parse_salary(text, expected):
     assert parse_salary(text) == expected
 
 
+@pytest.mark.parametrize("text", [
+    "Salary starts at $50k, depending on experience.",
+    "Base salary: from $50,000 per year.",
+    "Minimum salary: $50k.",
+    "Salary: at least $50k.",
+    "Base salary: $50k+",
+    "Salary: $50k or more.",
+])
+def test_lower_bound_is_not_invented_as_a_salary_ceiling(text):
+    # The hard filter treats a lone salary_min as the top too, so leave these unparsed.
+    assert parse_salary(text) is None
+
+
 def make_job(**kw):
     return Job(id="test:1", source="test", url="https://example.com/job", title="Engineer",
                company="Example", company_key="example", **kw)
