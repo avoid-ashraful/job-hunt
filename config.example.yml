@@ -217,6 +217,9 @@ rules:
       global_hiring: '\b(?:global(?:ly)? hiring|hir(?:e|ing) globally|recruit(?:ing)? globally)\b'
       candidate_region: '\b(?:remote|hir(?:e|ing)|candidates|applicants|countries|locations)\b[^.;\n]{0,60}\b(?:apac|asia[- ]pacific|south asia|(?<!southeast )(?<!south-east )(?<!east )(?<!central )asia|bangladesh)\b'
       any_location_candidates: '\bopen to (?:candidates|applicants) from any location\b'
+      anywhere_hiring: '\bfrom anywhere\b[^.;\n]{0,40}\bhire\b|\bhire\b[^.;\n]{0,40}\bfrom anywhere\b'
+      location_anywhere: '\blocation\W+(?:remote\W+)?anywhere\b'
+      eor_countries: '\b(?:eor|employer of record|employee of record)\b[^.;\n]{0,80}\b(?:countr(?:y|ies)|global(?:ly)?|worldwide)\b'
     ats_location: '^(?:remote[\s,;:()/–-]*)?(?:worldwide|anywhere|global)(?:[\s)]*)$'
   # Deterministic parsers (scanner/rules.py). Every pattern has a name; decisions are logged
   # with "<group>.<name>" so `scanner learn` can report how often each rule fires and how

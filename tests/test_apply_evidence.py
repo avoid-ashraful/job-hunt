@@ -67,8 +67,19 @@ def test_apply_evidence_defaults_and_config():
     ("Our team works remotely from Europe with colleagues in Asia.", False),
     ("Our customers are worldwide.", False),
     ("We hire in any country where we have an entity.", False),
+    ("The best engineers can do world-class work from anywhere, and we hire accordingly.", True),
+    ("*Location:* Remote - Anywhere", True),
+    ("Work from anywhere with flexible hours.", False),
 ])
 def test_strong_patterns(evidence, strong):
     job = Job(id="1", source="freehire", url="", title="", company="", company_key="",
               description=evidence, screen={"evidence": evidence})
     assert (ApplyEvidence({}).weak_reason(job) is None) == strong
+
+
+def test_strong_sentence_elsewhere_in_body_keeps_apply():
+    body = ("We are a location-independent company with a fully distributed team. "
+            "We use an Employer of Record service to facilitate seamless global hiring processes.")
+    job = Job(id="1", source="freehire", url="", title="", company="", company_key="", description=body,
+              screen={"evidence": "We are a location-independent company with a fully distributed team"})
+    assert ApplyEvidence({}).weak_reason(job) is None
