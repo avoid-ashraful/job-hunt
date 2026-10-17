@@ -28,3 +28,55 @@ The scanner only reads public endpoints, identifies itself, and follows publishe
 | Overleaf software-engineer resume template | Not a job source | Usually Overleaf account to edit | Not relevant to scanner | Resume aid only | Skip |
 
 The [Himalayas API](https://himalayas.app/api) refreshes daily and warns that unauthenticated callers share a public allowance. A free key is optional if the daily request budget becomes unreliable.
+
+## Company seed lists
+
+Run `uv run python -m scanner --config config.example.yml watchlist seeds` to refresh
+`watchlist.seeds.auto.yml`. Existing entries win by normalized company name; the
+hand-written `watchlist.seeds.yml`, including comments and board overrides, stays
+untouched. `watchlist build` combines both files through its existing `seeds_file`
+interface. These are leads for ownership-checked ATS resolution, not guarantees of
+current Bangladesh eligibility, suitable roles, or Deel/contract payment.
+
+Used (curl probes on this VPS, 2026-10-17):
+
+- [awesome-remote-job](https://github.com/lukasz-madon/awesome-remote-job): public raw
+  Markdown returned 200; repository last pushed September 2026. Only company-section
+  entries explicitly describing worldwide hiring are imported. The live run added
+  3 tracked entries (Ergeon, Iterative, TestGrid); Ergeon and Iterative also occur in
+  remoteintech's existing worldwide population, so only TestGrid expands that pool.
+- [remoteintech](https://github.com/remoteintech/remote-jobs): public source ZIP
+  returned 200. Added 9 entries whose original `Region` section explicitly includes
+  Asia/APAC and whose frontmatter is not worldwide (the latter is already read by
+  build). Coarse `asia-pacific` tags alone are unsafe: several mean India or Australia
+  only. Narrow subregions/country lists and qualifying timezone restrictions are
+  skipped. Agency/marketplace/crowdsourcing evidence and known India/Bangladesh HQ
+  are excluded using source evidence and configured company filters/HQ overrides.
+
+Rejected/deferred:
+
+- [Himalayas](https://himalayas.app/docs/remote-jobs-mcp): docs, robots, and public
+  jobs API returned 200; `/companies?worldwide=true` and `/companies/api` returned
+  403. The documented no-login MCP `get_companies` and `search_companies` work, but
+  `worldwide=true` returned 33,186 company entries, including universities and a
+  community bank with zero jobs, labeled “Global.” Company details expose HQ and
+  website but no explicit hiring-country evidence. Do not turn that label into a
+  worldwide hiring assertion. The JSON API documents jobs endpoints only; job
+  ingestion remains handled by the existing source. [Terms](https://himalayas.app/terms)
+  permit documented public API/MCP use; no blocked company pages were scraped.
+- [established-remote](https://github.com/yanirs/established-remote): raw Markdown
+  returned 200, repository last pushed July 2026. Its general introduction describes
+  global hiring, but individual rows lack worldwide/APAC eligibility; includes
+  consultancies and staffing platforms. Insufficient row-level evidence.
+- [Remotive](https://remotive.com/robots.txt): robots returned 200 and disallows
+  `/api/*`, company filter feeds, and `/remote-companies/page`; no directory crawl.
+- [Working Nomads](https://www.workingnomads.com/robots.txt): robots allows access,
+  but `/companies` returned 404; no usable structured company directory found.
+- [We Work Remotely](https://weworkremotely.com/robots.txt): robots permits public
+  pages, but `/remote-companies` returned 403 from this VPS; no bypass attempted.
+- Workable/Ashby/Greenhouse directories: ATS presence establishes neither worldwide
+  hiring nor Bangladesh eligibility, so these are resolution targets only.
+
+The committed import contains 12 additions to the hand seed list, 10 beyond
+remoteintech's worldwide pool. Older community entries and unknown HQ remain data
+quality limits; current job location/timezone checks still apply.

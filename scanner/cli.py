@@ -35,7 +35,7 @@ from scanner.report import reason_bucket, write_drop_log, write_report
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
 from scanner import sources
 from scanner.store import Store
-from scanner import watchlist
+from scanner import seed_sources, watchlist
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = ROOT / "private" / "config" / "config.yml"
@@ -411,7 +411,7 @@ def main() -> None:
     lr = sub.add_parser("learn", help="write the self-improvement report from the logs")
     lr.add_argument("--days", type=int, default=7)
     wl = sub.add_parser("watchlist", help="build, grow or list direct ATS company boards")
-    wl.add_argument("action", choices=["build", "grow", "list"])
+    wl.add_argument("action", choices=["build", "grow", "list", "seeds"])
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -446,14 +446,16 @@ def main() -> None:
         ats_cfg = cfg.get("sources", {}).get("ats", {})
         path = ROOT / ats_cfg.get("watchlist_file", "private/config/watchlist.yml")
         denied = tuple(str(c).lower() for c in ats_cfg.get("hq_deny_countries", ["in", "bd"]))
-        if args.action == "build":
+        if args.action == "seeds":
+            print(seed_sources.update_seeds(ROOT / "watchlist.seeds.yml", ROOT / "watchlist.seeds.auto.yml", cfg))
+        elif args.action == "build":
             vendor = ROOT / cfg["candidate"].get("company_priors", "vendor/remote-jobs/src/companies")
             cache = ROOT / cfg["output"]["state_dir"] / "watchlist_resolution"
             db_path = ROOT / cfg["output"]["state_dir"] / "scanner.sqlite"
-            seeds = ROOT / "watchlist.seeds.yml"
-            print(watchlist.build(vendor, path, cache, workers=ats_cfg.get("build_workers", 8), seeds_file=seeds,
-                                  deny_countries=denied, hq_lookup=_hq_lookup(cfg, db_path), db_path=db_path, cfg=cfg,
-                                  max_seconds=60 * ats_cfg.get("build_max_minutes", 20)))
+            with seed_sources.build_seeds(ROOT / "watchlist.seeds.yml", ROOT / "watchlist.seeds.auto.yml") as seeds:
+                print(watchlist.build(vendor, path, cache, workers=ats_cfg.get("build_workers", 8), seeds_file=seeds,
+                                      deny_countries=denied, hq_lookup=_hq_lookup(cfg, db_path), db_path=db_path, cfg=cfg,
+                                      max_seconds=60 * ats_cfg.get("build_max_minutes", 20)))
         elif args.action == "grow":
             _, store = load(args.config)
             print(watchlist.grow(store.db, path, deny_countries=denied, cfg=cfg))
