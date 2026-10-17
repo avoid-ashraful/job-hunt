@@ -59,7 +59,7 @@ Improvements are applied by editing `rules:` in `private/config/config.yml` (no 
 recording the decision in `private/config/instructions.md`, running `uv run pytest`, and
 comparing a dry run: `uv run python -m scanner run --dry-run --days 3`.
 
-The weekly script is `scripts/weekly-learn.sh`. Install `0 5 * * 6 /home/ubuntu/job_hunt/scripts/weekly-learn.sh` in the UTC server crontab for 11:00 Saturday in Asia/Dhaka.
+The weekly script is `scripts/weekly-learn.sh`. Install `0 6 * * 6 /home/ubuntu/job_hunt/scripts/weekly-learn.sh` in the UTC server crontab for 12:00 Saturday in Asia/Dhaka (after the daily scan).
 
 Salary ranges missing from source fields are conservatively parsed from descriptions before filtering; Pay preserves the matched text, while comparisons use configured currency rates and annual multipliers (currencyless ranges are display-only).
 
