@@ -10,9 +10,19 @@ from urllib.parse import quote, urljoin, urlsplit
 NAMES = {"workday", "rippling", "jazzhr", "homerun", "dover", "comeet", "factorial"}
 
 
+def _workday(board: str) -> tuple[str, str, str]:
+    """Our `tenant|wdN|site` board, or freehire's `tenant.wdN.myworkdayjobs.com/site` in its job ids."""
+    if m := re.fullmatch(r"([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/([^/]+)", board, re.I):
+        return m[1].lower(), m[2].lower(), m[3]
+    parts = board.split("|")
+    if len(parts) != 3:
+        raise ValueError(f"invalid Workday board: {board}")
+    return parts[0], parts[1], parts[2]
+
+
 def landing(ats: str, board: str) -> str:
     if ats == "workday":
-        tenant, wd, site = board.split("|")
+        tenant, wd, site = _workday(board)
         if not re.fullmatch(r"[a-z0-9-]+", tenant) or not re.fullmatch(r"wd\d+", wd):
             raise ValueError("invalid Workday host")
         return f"https://{tenant}.{wd}.myworkdayjobs.com/{quote(site, safe='')}"
@@ -27,7 +37,7 @@ def landing(ats: str, board: str) -> str:
 def base(ats: str, board: str) -> tuple[str, dict]:
     slug = quote(board, safe="")
     if ats == "workday":
-        tenant, wd, site = board.split("|")
+        tenant, wd, site = _workday(board)
         landing(ats, board)
         return f"https://{tenant}.{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{quote(site, safe='')}/jobs", {}
     if ats == "rippling":

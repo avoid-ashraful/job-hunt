@@ -165,3 +165,14 @@ def test_workday_liveness_accepts_localized_links(monkeypatch):
                           url="https://example.wd5.myworkdayjobs.com/en-US/External/job/Remote/R1")
     assert liveness.check(job) == liveness.OPEN
     assert urls == ["https://example.wd5.myworkdayjobs.com/wday/cxs/example/External/job/Remote/R1"]
+
+
+def test_freehire_workday_ids_are_usable():
+    from scanner import watchlist
+    from scanner.sources import _more_ats
+
+    fid = "workday:keybank.wd5.myworkdayjobs.com/External_Career_Site:/job/Remote-United-States/Sr-Engineer_R-1"
+    assert watchlist._ats_from_id(fid) == ("workday", "keybank|wd5|External_Career_Site")
+    assert _more_ats.base("workday", "keybank.wd5.myworkdayjobs.com/External_Career_Site")[0] == \
+        "https://keybank.wd5.myworkdayjobs.com/wday/cxs/keybank/External_Career_Site/jobs"
+    assert watchlist._ats_from_id("workday:garbage:1") is None

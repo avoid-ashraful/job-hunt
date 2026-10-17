@@ -773,6 +773,7 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
             try:
                 result = future.result()
             except Exception as exc:
+                log.warning("resolver failed for %s", seed["company"], exc_info=True)
                 result = {"reason": f"resolver error: {type(exc).__name__}"}
 
             if seed.get("ats") and seed.get("board"):
@@ -829,6 +830,11 @@ def _ats_from_id(job_id: str) -> tuple[str, str] | None:
         "workday", "rippling", "jazzhr", "homerun", "dover", "comeet", "factorial"
     }:
         return None
+    if parts[0] == "workday":
+        try:
+            return "workday", "|".join(_more_ats._workday(parts[1]))
+        except ValueError:
+            return None
     return parts[0], parts[1]
 
 
