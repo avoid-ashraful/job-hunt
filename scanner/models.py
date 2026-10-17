@@ -35,6 +35,7 @@ class Job:
     salary_period: str | None = None
     requires_clearance: bool | None = None
     reality: dict = field(default_factory=dict)
+    watchlist: bool = False  # live employer board, or a freehire copy from a watched company
 
     # filled in by the pipeline
     family: str | None = None
