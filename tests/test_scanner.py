@@ -390,6 +390,24 @@ def test_openai_compatible_timeouts_move_on_to_the_next_model(monkeypatch):
     assert len(tries) == 2
 
 
+def test_openai_compatible_long_retry_after_moves_on_without_sleeping(monkeypatch):
+    import pytest
+    import requests
+
+    from scanner import eligibility
+
+    client = eligibility.OpenAICompatClient("orca", "https://x/v1", "m", "k", "sys")
+    resp = requests.Response()
+    resp.status_code, resp._content = 429, b'{"error": {"code": "free_rate_limited"}}'
+    resp.headers["Retry-After"] = "9096"
+    tries = []
+    monkeypatch.setattr(client.session, "post", lambda *a, **kw: tries.append(1) or resp)
+    monkeypatch.setattr(eligibility.time, "sleep", lambda s: pytest.fail("slept on an hours-long quota"))
+    with pytest.raises(eligibility.QuotaExhausted):
+        client.complete("### JOB J1")
+    assert len(tries) == 1
+
+
 @pytest.mark.parametrize("evidence, kept", [
     ("Enjoy the freedom to work from anywhere, with flexible hours", False),
     ("Work from anywhere to facilitate your work life balance", False),

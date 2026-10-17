@@ -187,6 +187,9 @@ class OpenAICompatClient:
             if resp.status_code in (401, 402, 403, 404, 410):
                 raise QuotaExhausted(f"{self.name}: HTTP {resp.status_code} {resp.text[:120]}")
             if resp.status_code == 429 or resp.status_code >= 500:
+                wait = resp.headers.get("Retry-After", "")
+                if wait.isdigit() and int(wait) > 120:  # an hours-long quota window: move on now
+                    raise QuotaExhausted(f"{self.name}: HTTP {resp.status_code}, retry after {wait}s")
                 if attempt == retries - 1:
                     raise QuotaExhausted(f"{self.name}: HTTP {resp.status_code} after {retries} tries")
                 time.sleep(_retry_seconds(resp.text) or min(60, 2 ** (attempt + 2)))
