@@ -46,6 +46,8 @@ def _pace(url: str) -> None:
     while True:
         with _RATE_LOCK:
             now = time.monotonic()
+            if _BLOCKED.get(host, (0,))[0] > now:  # blocked while we waited; _request answers from the block
+                return
             wait = _NEXT_REQUEST.get(host, 0) - now
             if wait <= 0:
                 interval = 1.0 if host.endswith("workable.com") else 0.25
@@ -85,10 +87,10 @@ def _feedback(url: str, response: requests.Response) -> None:
 def _request(session: requests.Session, url: str, *, params: dict | None = None,
              retries: int = 3, timeout: int = 12) -> requests.Response:
     for attempt in range(retries):
+        _pace(url)
         blocked = _BLOCKED.get(_host(url))
         if blocked and blocked[0] > time.monotonic():
             return blocked[1]
-        _pace(url)
         response = session.get(url, params=params, timeout=timeout)
         _feedback(url, response)
         if attempt + 1 < retries:

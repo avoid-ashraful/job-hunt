@@ -416,3 +416,17 @@ def test_retry_skips_guesses_for_ats_no_longer_guessed():
     session = Session()
     result = watchlist.resolve_company({"company": "Acme", "retry_probes": [["workable", "acme"]], "retry_trusted": []}, session)
     assert session.calls == [] and result == {"reason": "no supported ATS board found"}
+
+
+def test_thread_waiting_in_pace_sees_a_new_block(monkeypatch, clock):
+    url = "https://apply.workable.com/api/v1/widget/accounts/a"
+    ats._NEXT_REQUEST["apply.workable.com"] = clock[0] + 60
+    blocked = response(429)
+
+    def sleep(seconds):  # another thread gets a 12-hour Retry-After while this one waits
+        clock[0] += seconds
+        ats._BLOCKED["apply.workable.com"] = (clock[0] + 40000, blocked)
+
+    monkeypatch.setattr(ats.time, "sleep", sleep)
+    session = Session()
+    assert ats._request(session, url) is blocked and session.calls == []
