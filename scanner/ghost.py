@@ -55,7 +55,7 @@ class GhostRules:
         if _first(self.scraped, job.description):
             fired.append("scraped_repost")
         source = job.id.split(":", 1)[0]
-        if self.aggregators.fullmatch(source):
+        if not job.watchlist and self.aggregators.fullmatch(source):
             fired.append(f"aggregator_source ({source})")
         if len(job.description.strip()) < self.min_chars:
             fired.append("thin_description")

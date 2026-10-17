@@ -47,7 +47,7 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
         why_text = "; ".join(x for x in (sc.get("why", ""), sc.get("prior", ""), ghost) if x)
         why = f" {_cell(why_text)} |" if with_why else ""
         lines.append(
-            f"| `{job_ref(job.id)}` | {sc.get('fit', '')}/5 | {_cell(job.company)} | {_cell(job.title)} | {_cell(who)} | "
+            f"| `{job_ref(job.id)}` | {sc.get('fit', '')}/5 | {_cell(job.company)} | {'★ watchlist ' if job.watchlist else ''}{_cell(job.title)} | {_cell(who)} | "
             f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_salary(job)} | {seen} | [apply]({job.url}) |"
         )
     return lines

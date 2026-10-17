@@ -6,6 +6,7 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from html import unescape
@@ -73,13 +74,36 @@ def get(session: requests.Session, url: str, *, params: dict | None = None, retr
     raise RuntimeError(f"ATS request failed: {url}")
 
 
+def workable_markdown(session: requests.Session, board: str) -> list[dict]:
+    """Use Workable's small public feed when its widget API is rate limited."""
+    url = f"https://apply.workable.com/{quote(board, safe='')}/jobs.md"
+    _pace(url)
+    response = session.get(url, timeout=10)
+    response.raise_for_status()
+    rows = []
+    for line in response.text.splitlines():
+        if not line.startswith("|") or "[View]" not in line:
+            continue
+        cols = [x.strip() for x in line.split("|")]
+        match = re.search(r"\[View\]\((https://apply\.workable\.com/[^)]+)\)", line)
+        if len(cols) < 8 or not match or not cols[1] or cols[1] == "Title":
+            continue
+        detail_url = match.group(1)
+        jid = detail_url.removesuffix(".md").rstrip("/").rsplit("/", 1)[-1]
+        rows.append({"shortcode": jid, "title": cols[1], "location": cols[3],
+                     "published_on": cols[6], "url": detail_url.removesuffix(".md"),
+                     "_markdown_detail": detail_url})
+    return rows
+
+
 def _date(value: str | int | None) -> datetime | None:
     if not value:
         return None
     try:
         if isinstance(value, int):
             return datetime.fromtimestamp(value / 1000 if value > 10**11 else value, timezone.utc)
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
     except (TypeError, ValueError, OverflowError):
         return None
 
@@ -102,7 +126,10 @@ def _salary(raw: dict, ats: str) -> tuple[float | None, float | None, str | None
         ranges = raw.get("pay_input_ranges") or []
         if ranges:
             sal = ranges[0]
-            return sal.get("min_cents", 0) / 100 or None, sal.get("max_cents", 0) / 100 or None, sal.get("currency_type"), "year"
+            minimum, maximum = sal.get("min_cents"), sal.get("max_cents")
+            return (minimum / 100 if isinstance(minimum, (int, float)) else None,
+                    maximum / 100 if isinstance(maximum, (int, float)) else None,
+                    sal.get("currency_type"), "year")
     return None, None, None, None
 
 
@@ -210,9 +237,15 @@ def _record(raw: dict, company: dict, cfg: dict, session: requests.Session) -> J
         desc = "\n".join(str(s.get("text", "")) for s in sections.values() if isinstance(s, dict))
         raw = {**detail, **raw}
     if ats == "workable" and not desc:
-        detail = get(session, f"https://apply.workable.com/api/v1/accounts/{quote(board)}/jobs/{jid}")
-        desc = detail.get("description") or ""
-        raw = {**detail, **raw}
+        if raw.get("_markdown_detail"):
+            _pace(raw["_markdown_detail"])
+            response = session.get(raw["_markdown_detail"], timeout=10)
+            response.raise_for_status()
+            desc = response.text
+        else:
+            detail = get(session, f"https://apply.workable.com/api/v1/accounts/{quote(board)}/jobs/{jid}")
+            desc = detail.get("description") or ""
+            raw = {**detail, **raw}
     desc = plain(desc) if "<" in str(desc) else str(desc).strip()
     url = raw.get("absolute_url") or raw.get("hostedUrl") or raw.get("jobUrl") or raw.get("applyUrl") or raw.get("url") or raw.get("shortlink") or raw.get("applicationUrl")
     if not url:
@@ -245,10 +278,22 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
     ats, board = company["ats"].lower(), company["board"]
     session = requests.Session()
     session.headers["User-Agent"] = USER_AGENT
+    if ats == "workable":
+        session.headers.update({"Accept-Language": "en-US,en;q=0.9", "Origin": "https://apply.workable.com"})
     try:
         url, params = _base(ats, board)
-        data = get(session, url, params=params)
-        raws = _items(data, ats)
+        used_fallback = False
+        try:
+            data = get(session, url, params=params)
+            raws = _items(data, ats)
+        except requests.RequestException:
+            if ats != "workable":
+                raise
+            data = {}
+            raws = workable_markdown(session, board)
+            used_fallback = True
+        if ats == "workable" and not raws and not used_fallback:
+            raws = workable_markdown(session, board)
         if ats == "smartrecruiters" and isinstance(data, dict):
             total = min(data.get("totalFound", len(raws)), cfg.get("max_board_jobs", 500))
             for offset in range(100, total, 100):
@@ -270,7 +315,7 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
         session.close()
 
 
-def fetch(cfg: dict, days: int):
+def fetch(cfg: dict, days: int) -> Iterator[Job]:
     """Yield all live remote jobs, including older posts, from watched boards."""
     path = Path(cfg.get("watchlist_file", "private/config/watchlist.yml"))
     if not path.exists():

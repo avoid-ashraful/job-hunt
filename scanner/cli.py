@@ -11,6 +11,7 @@ import argparse
 import logging
 import os
 import random
+import sqlite3
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +30,7 @@ from scanner.report import reason_bucket, write_drop_log, write_report
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
 from scanner import sources
 from scanner.store import Store
+from scanner import watchlist
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = ROOT / "private" / "config" / "config.yml"
@@ -42,6 +44,34 @@ FEEDBACK_LABELS = {
     "closed": "posting was closed",
 }
 log = logging.getLogger("scanner")
+
+
+def _hq_lookup(cfg: dict, db_path: Path):
+    """Read known HQ profiles and checked overrides when the profile module is installed."""
+    try:
+        from scanner.company_profile import hq_country
+    except ImportError:
+        return None
+    profiles = {}
+    if db_path.exists():
+        db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_profiles'").fetchone():
+                profiles = dict(db.execute("SELECT company_key, hq_country FROM company_profiles WHERE hq_country IS NOT NULL"))
+        finally:
+            db.close()
+    market_cfg = cfg.get("filters", {}).get("company_market", {})
+
+    def lookup(name: str) -> str | None:
+        key = watchlist.normalize_company(name)
+        if key in profiles:
+            return profiles[key]
+        stub = Job(id="", source="watchlist", url="", title="", company=name,
+                   company_key=key, description="")
+        country, _ = hq_country(stub, market_cfg)
+        return country
+
+    return lookup
 
 
 def load_env(path: Path) -> None:
@@ -77,7 +107,18 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         days = src["first_run_days"] if store.is_empty() else src["daily_lookback_days"]
     log.info("fetching jobs first seen in the last %s days", days)
     fetched: dict[str, Job] = {}
-    for job in sources.fetch_all(cfg["sources"], days):
+    source_cfg = dict(cfg["sources"])
+    watch_cfg = cfg.get("sources", {}).get("ats", {})
+    watch_path = ROOT / watch_cfg.get("watchlist_file", "private/config/watchlist.yml")
+    if "ats" in source_cfg:
+        source_cfg["ats"] = {**source_cfg["ats"], "filters": cfg["filters"], "watchlist_file": str(watch_path)}
+    denied = {str(c).lower() for c in watch_cfg.get("hq_deny_countries", ["in", "bd"])}
+    watched = [c for c in watchlist.list_entries(watch_path) if str(c.get("hq_country") or "").lower() not in denied]
+    watched_keys = {watchlist.normalize_company(c["company"]) for c in watched}
+    watched_boards = {(c.get("ats"), c.get("board")) for c in watched}
+    for job in sources.fetch_all(source_cfg, days):
+        if job.company_key in watched_keys or tuple(job.id.split(":", 2)[:2]) in watched_boards:
+            job.watchlist = True
         fetched.setdefault(job.id, job)
     for job in fetched.values():
         store.upsert(job, today)
@@ -262,6 +303,9 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     store.log_run(now.isoformat(), len(fetched), len(passed), len(kept), len(kept),
                   str(report.relative_to(ROOT)), 0)
     store.commit()
+    if watch_cfg.get("enabled"):
+        stats_grow = watchlist.grow(store.db, watch_path, deny_countries=tuple(denied))
+        log.info("watchlist grew by %s companies (%s total)", stats_grow["added"], stats_grow["total"])
     log.info("wrote %s", report)
     return report
 
@@ -313,6 +357,8 @@ def main() -> None:
     f.add_argument("note", nargs="*")
     lr = sub.add_parser("learn", help="write the self-improvement report from the logs")
     lr.add_argument("--days", type=int, default=7)
+    wl = sub.add_parser("watchlist", help="build, grow or list direct ATS company boards")
+    wl.add_argument("action", choices=["build", "grow", "list"])
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -325,3 +371,20 @@ def main() -> None:
 
         cfg, store = load(args.config)
         print(learn(cfg, store, ROOT, args.days))
+    elif args.cmd == "watchlist":
+        cfg = yaml.safe_load(args.config.read_text())
+        ats_cfg = cfg.get("sources", {}).get("ats", {})
+        path = ROOT / ats_cfg.get("watchlist_file", "private/config/watchlist.yml")
+        denied = tuple(str(c).lower() for c in ats_cfg.get("hq_deny_countries", ["in", "bd"]))
+        if args.action == "build":
+            vendor = ROOT / cfg["candidate"].get("company_priors", "vendor/remote-jobs/src/companies")
+            cache = ROOT / cfg["output"]["state_dir"] / "watchlist_resolution"
+            db_path = ROOT / cfg["output"]["state_dir"] / "scanner.sqlite"
+            print(watchlist.build(vendor, path, cache, workers=ats_cfg.get("build_workers", 8),
+                                  deny_countries=denied, hq_lookup=_hq_lookup(cfg, db_path), db_path=db_path))
+        elif args.action == "grow":
+            _, store = load(args.config)
+            print(watchlist.grow(store.db, path, deny_countries=denied))
+        else:
+            for company in watchlist.list_entries(path):
+                print(f"{company['company']}\t{company.get('ats', '-')}/{company.get('board', '-')}\t{company.get('hq_country', '')}\t{company.get('hires', '')}")

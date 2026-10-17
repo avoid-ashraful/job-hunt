@@ -12,6 +12,36 @@ candidate:
   resume: private/profile/resume.pdf
 
 sources:
+  ats:
+    enabled: true
+    # Live public ATS boards are checked before freehire; first ID wins.
+    watchlist_file: private/config/watchlist.yml
+    workers: 5                     # concurrent companies in a daily run
+    build_workers: 8               # concurrent company resolutions during build
+    max_board_jobs: 500            # cap paginated SmartRecruiters boards
+    request_delay_s: 0.2           # between pages on one board
+    hq_deny_countries: [in, bd]    # ISO HQ countries excluded from the watchlist
+    location_patterns:
+      remote: '\b(remote|anywhere|worldwide)\b'
+      global: '\b(global|worldwide|anywhere)\b'
+      regions:
+        apac: '\b(apac|asia[- ]pacific|asia)\b'
+        emea: '\b(emea|europe|middle east|africa)\b'
+        latam: '\b(latam|latin america)\b'
+        north_america: '\b(north america|americas)\b'
+      # Map country-only ATS locations to source-style regions for long-shot ranking.
+      country_regions: {bd: apac, in: apac, us: north_america, ca: north_america,
+                        gb: emea, sg: apac, my: apac, au: apac, nz: apac}
+      countries:
+        bd: '\b(bangladesh)\b'
+        in: '\b(india)\b'
+        us: '\b(usa|u\.?s\.?a?|united states)\b'
+        ca: '\b(canada)\b'
+        gb: '\b(uk|united kingdom|great britain)\b'
+        sg: '\b(singapore)\b'
+        my: '\b(malaysia)\b'
+        au: '\b(australia)\b'
+        nz: '\b(new zealand)\b'
   freehire:
     enabled: true
     base_url: https://freehire.me/api/v1
@@ -25,6 +55,7 @@ sources:
     request_delay_s: 1.0
 
 filters:
+  max_age_days_watchlist: 120   # live watched ATS boards: older posts can still be open
   max_age_days: 21              # age = earliest of posted date and first-seen date
   not_seen_live_days: 10        # not seen live by the source for this long: probably closed (freehire re-crawls ~weekly)
 
@@ -148,6 +179,7 @@ rules:
       following_places: '\b(?:work|working|reside|located|live|hire|hiring|remote)\b[^.;\n]{0,40}?(?P<place>(?:in\s+)?(?:one of\s+)?(?:the\s+)?following\s+(?:states|countries|locations|regions|cities)[^.\n]{0,200})'
       entity_countries: '(?P<place>\b(?:one of our\s+|countries where we have (?:a |an )?(?:legal )?|locations where we have (?:a |an )?)entit(?:y|ies)\b[^.\n]{0,200})'
     positive:
+      ats_location_global: '\b(?:remote[\s,;:()/-]*)?(?:global|worldwide|anywhere)\b'  # ATS location, not description
       anywhere_world: '\banywhere\s+in\s+the\s+world\b'
       worldwide: '\b(?:remote|hire|hiring|recruit\w*|position|role|job|open|candidates|applicants|location)\b[^.;\n]{0,25}\b(?:worldwide|world-wide|globally(?!\s+distributed)|from any country|in any country(?!\s+where)|any location|any time ?zone)\b'
       remote_global_label: '\bremote\s*[(\-–:/|]\s*(?:worldwide|global|anywhere)\b'

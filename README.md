@@ -111,8 +111,17 @@ uv run python -m scanner run --skip-llm   # rules only (ambiguous jobs go to Che
 uv run python -m scanner feedback <ref> <label> [note]
 uv run python -m scanner learn --days 7
 uv run python -m scanner run --days 7     # override the fetch window
+uv run python -m scanner watchlist build   # resolve worldwide companies to public ATS boards (cached)
+uv run python -m scanner watchlist grow    # add eligible companies seen in the database
+uv run python -m scanner watchlist list    # show watched boards
 uv run pytest
 ```
+
+The direct ATS source reads `private/config/watchlist.yml` before freehire. Copy
+`watchlist.example.yml` there to start, then run `watchlist build` after updating
+the remoteintech submodule. The daily run grows the list from global tags,
+eligibility decisions and positive feedback. Public board links are checked live;
+jobs from watched companies use the longer age window in `filters`.
 
 Cron (server in UTC): `0 5 * * * scripts/daily.sh` runs at 11:00 Asia/Dhaka.
 The first run backfills 21 days; later runs look back 3 days and rely on dedup.
