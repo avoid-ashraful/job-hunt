@@ -56,3 +56,16 @@ recording the decision in `private/config/instructions.md`, running `uv run pyte
 comparing a dry run: `uv run python -m scanner run --dry-run --days 3`.
 
 The weekly script is `scripts/weekly-learn.sh`. Install `0 5 * * 6 /home/ubuntu/job_hunt/scripts/weekly-learn.sh` in the UTC server crontab for 11:00 Saturday in Asia/Dhaka.
+
+## Watchlist probing
+
+`scanner watchlist build` shares adaptive backoff across each ATS provider after a 429,
+using Retry-After (up to 60 seconds) or exponential delays, then reducing delays after
+successful requests. Probes retry once before recording a rate limit. Later builds
+retry only the unresolved boards, after fresh seeds, without the website-failure
+cooldown or attempt limit. Older rate-limited caches are also retried, even if marked dead.
+Common ATSs are tried first, using existing resolved boards to order providers, and
+duplicate probe URLs are skipped. No additional retry flag is needed.
+
+Tracked seeds can supply `ats` and `board` to validate an exact board without guessing,
+and `aliases` to accept alternate company names in board ownership checks.

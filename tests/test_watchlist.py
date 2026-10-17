@@ -107,7 +107,7 @@ def test_workable_markdown_feed_parser(monkeypatch):
              "[View](https://apply.workable.com/example/jobs/view/ABC123.md) |")
     class Session:
         def get(self, url, **kwargs):
-            return SimpleNamespace(text=table, raise_for_status=lambda: None)
+            return SimpleNamespace(status_code=200, text=table, raise_for_status=lambda: None)
     rows = ats.workable_markdown(Session(), "example")
     assert rows[0]["shortcode"] == "ABC123"
     assert rows[0]["_markdown_detail"].endswith("ABC123.md")

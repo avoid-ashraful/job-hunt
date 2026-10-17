@@ -19,7 +19,7 @@ import yaml
 from scanner.board_owner import AGGREGATORS, DEMO, _domain, owns
 
 OWNER_CHECK = 2  # bump when the ownership check changes, so earlier verdicts are redone
-from scanner.dedup import normalize_company
+from scanner.dedup import normalize_company, normalize_url
 from scanner.sources.ats import (
     USER_AGENT,
     _base,
@@ -156,8 +156,11 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
-def company_match(cand_name: str, target_name: str, target_website: str = "", cand_website: str = "") -> bool:
+def company_match(cand_name: str, target_name: str, target_website: str = "", cand_website: str = "",
+                  aliases: list[str] | None = None) -> bool:
     """Verify company candidate matches target to reject slug collisions."""
+    if any(company_match(cand_name, alias, target_website, cand_website) for alias in aliases or []):
+        return True
     if not cand_name and not cand_website:
         return True
     nc = _norm(cand_name)
@@ -183,7 +186,7 @@ def company_match(cand_name: str, target_name: str, target_website: str = "", ca
 
 
 def _valid_board(session: requests.Session, ats: str, board: str, *args,
-                 company_name: str = "", website: str = "", **kwargs) -> bool | None:
+                 company_name: str = "", website: str = "", aliases: list[str] | None = None, **kwargs) -> bool | None:
     try:
         if ats == "workable":
             session.headers["Origin"] = "https://apply.workable.com"
@@ -191,13 +194,15 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
             session.headers["Accept"] = "application/json"
 
         url, params = _base(ats, board)
+        if ats in {"lever", "lever_eu", "smartrecruiters"}:
+            params = {**params, "limit": 1}
         if ats == "personio":
             try:
-                text = get_text(session, url, retries=1, timeout=7)
+                text = get_text(session, url, retries=2, timeout=7)
             except requests.HTTPError as exc:
                 if exc.response is not None and exc.response.status_code == 404:
                     alt = f"https://{quote(board, safe='')}.jobs.personio.com/xml"
-                    text = get_text(session, alt, retries=1, timeout=7)
+                    text = get_text(session, alt, retries=2, timeout=7)
                 elif exc.response is not None and exc.response.status_code == 429:
                     return None
                 else:
@@ -206,7 +211,7 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
             return bool(positions)
         elif ats == "teamtailor":
             try:
-                text = get_text(session, url, retries=1, timeout=7)
+                text = get_text(session, url, retries=2, timeout=7)
             except requests.HTTPError as exc:
                 if exc.response is not None and exc.response.status_code == 429:
                     return None
@@ -215,10 +220,15 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
             return bool(items)
 
         try:
-            data = get(session, url, params=params, retries=1, timeout=7)
-        except requests.RequestException:
+            data = get(session, url, params=params, retries=2, timeout=7)
+        except requests.RequestException as exc:
             if ats == "workable":
-                return bool(workable_markdown(session, board))
+                try:
+                    if workable_markdown(session, board):
+                        return True
+                except requests.RequestException:
+                    if exc.response is None or exc.response.status_code != 429:
+                        raise
             raise
 
         if ats in {"lever", "lever_eu"}:
@@ -227,7 +237,7 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
             if isinstance(data, dict) and "offers" in data:
                 offers = data.get("offers") or []
                 if offers and offers[0].get("company_name"):
-                    if not company_match(offers[0]["company_name"], company_name, website):
+                    if not company_match(offers[0]["company_name"], company_name, website, aliases=aliases):
                         return False
                 return bool(offers)
             return False
@@ -235,7 +245,7 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
             if isinstance(data, list):
                 if data and isinstance(data[0], dict):
                     cname = (data[0].get("company") or {}).get("name")
-                    if cname and not company_match(cname, company_name, website):
+                    if cname and not company_match(cname, company_name, website, aliases=aliases):
                         return False
                 return bool(data)
             return False
@@ -249,9 +259,9 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
             jobs = data.get("jobs") or []
             if company_name and jobs:
                 try:
-                    info = get(session, f"https://boards-api.greenhouse.io/v1/boards/{quote(board, safe='')}", retries=1, timeout=5)
+                    info = get(session, f"https://boards-api.greenhouse.io/v1/boards/{quote(board, safe='')}", retries=2, timeout=5)
                     if isinstance(info, dict) and info.get("name"):
-                        if not company_match(info["name"], company_name, website):
+                        if not company_match(info["name"], company_name, website, aliases=aliases):
                             return False
                 except Exception:
                     pass
@@ -260,7 +270,7 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
             cand_name = data.get("name") or ""
             cand_web = data.get("website") or ""
             if cand_name or cand_web:
-                if not company_match(cand_name, company_name, website, cand_web):
+                if not company_match(cand_name, company_name, website, cand_web, aliases=aliases):
                     return False
             return bool(data.get("results") or data.get("jobs") or data.get("name"))
         key = "content" if ats == "smartrecruiters" else "jobs"
@@ -273,12 +283,17 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
         return False
 
 
+ATS_ORDER = ("greenhouse", "ashby", "lever", "workable", "lever_eu", "smartrecruiters",
+             "recruitee", "breezy", "bamboohr", "personio", "teamtailor", "pinpoint")
 
-def _check_board(session: requests.Session, ats: str, board: str, cname: str, cweb: str) -> bool | None:
+
+def _check_board(session: requests.Session, ats: str, board: str, cname: str, cweb: str,
+                 aliases: list[str] | None = None) -> bool | None:
     try:
-        return _valid_board(session, ats, board, company_name=cname, website=cweb)
+        return _valid_board(session, ats, board, company_name=cname, website=cweb, aliases=aliases)
     except TypeError:
         return _valid_board(session, ats, board)
+
 
 def resolve_company(company: dict, session: requests.Session | None = None,
                     hints: list[tuple[str, str]] | None = None) -> dict:
@@ -293,12 +308,64 @@ def resolve_company(company: dict, session: requests.Session | None = None,
         cname = company.get("company", "")
         cweb = company.get("website", "")
 
-        # 0. Database hints check
-        if hints:
-            for ats, board in hints:
-                valid = _check_board(session, ats, board, cname, cweb)
-                if valid:
-                    return {"ats": ats, "board": board, "reason": "database hint"}
+        unresolved: set[tuple[str, str]] = set()
+        trusted: set[tuple[str, str]] = set()
+        seen: set[str] = set()
+        aliases = company.get("aliases") or []
+        owner_website = "" if _domain(cweb).endswith(AGGREGATORS) else cweb
+
+        def probe(ats, board, reason, trust=False):
+            url = normalize_url(_base(ats, board)[0])
+            if url in seen:
+                return None
+            seen.add(url)
+            valid = _check_board(session, ats, board, cname, cweb, aliases)
+            if valid is None:
+                unresolved.add((ats, board))
+                if trust:
+                    trusted.add((ats, board))
+            if not valid:
+                return None
+            if not trust:
+                try:
+                    owner = owns(session, ats, board, cname, owner_website, aliases=aliases, raise_on_limit=True)
+                except requests.HTTPError as exc:
+                    if exc.response is not None and exc.response.status_code == 429:
+                        unresolved.add((ats, board))
+                    return None
+                if not owner:
+                    return None
+            result = {"ats": ats, "board": board, "reason": reason}
+            if not trust:
+                result["owner_check"] = OWNER_CHECK
+            return result
+
+        def miss():
+            reason = "rate limited while probing a board" if unresolved else "no supported ATS board found"
+            if failures:
+                reason += f" ({', '.join(dict.fromkeys(failures))})"
+            result = {"reason": reason}
+            if unresolved:
+                result["retry_probes"] = [list(p) for p in sorted(unresolved)]
+                result["retry_trusted"] = [list(p) for p in sorted(trusted)]
+            return result
+
+        if company.get("ats") and company.get("board"):
+            return probe(company["ats"], company["board"], "seed override", trust=True) or miss()
+
+        if "retry_probes" in company:
+            retry_trusted = {tuple(p) for p in company.get("retry_trusted", [])}
+            for ats, board in company["retry_probes"]:
+                trust = (ats, board) in retry_trusted
+                result = probe(ats, board, "careers link" if trust else "verified slug", trust)
+                if result:
+                    return result
+            return miss()
+
+        for ats, board in hints or []:
+            result = probe(ats, board, "database hint", trust=True)
+            if result:
+                return result
 
         # 1. Direct careers_url and website probe (with 1-hop crawl)
         visited_urls = set()
@@ -333,42 +400,19 @@ def resolve_company(company: dict, session: requests.Session | None = None,
 
         # 2. Check candidate boards found in HTML (careers link / embed). A link on a page that lists many
         #    companies (an HN thread, an aggregator) is just a guess and must pass the ownership check.
-        limited = False
         shared_page = any(_domain(u).endswith(AGGREGATORS) for u in filter(None, (careers_url, website)))
         for ats, board in dict.fromkeys(links):
-            valid = _check_board(session, ats, board, cname, cweb)
-            limited |= valid is None
-            if not valid:
-                continue
-            if shared_page:
-                owner = owns(session, ats, board, cname, "")
-                limited |= owner is None
-                if not owner:
-                    continue
-                return {"ats": ats, "board": board, "reason": "verified slug", "owner_check": OWNER_CHECK}
-            return {"ats": ats, "board": board, "reason": "careers link"}
+            result = probe(ats, board, "verified slug" if shared_page else "careers link", not shared_page)
+            if result:
+                return result
 
-        # 3. Slug guessing across supported ATSs
         slugs = _slugs(company)
-        ats_candidates = (
-            "ashby", "greenhouse", "lever", "lever_eu",
-            "recruitee", "breezy", "bamboohr", "pinpoint", "personio", "teamtailor", "smartrecruiters"
-        )
-        guesses = [(ats, slug) for slug in slugs for ats in ats_candidates]
-        for ats, board in dict.fromkeys(guesses):
-            valid = _check_board(session, ats, board, cname, cweb)
-            limited |= valid is None
-            if not valid:
-                continue
-            owner = owns(session, ats, board, cname, cweb)  # a guessed slug can be someone else's board
-            limited |= owner is None
-            if owner:
-                return {"ats": ats, "board": board, "reason": "verified slug", "owner_check": OWNER_CHECK}
-
-        reason = "rate limited while probing a board" if limited else "no supported ATS board found"
-        if failures:
-            reason += f" ({', '.join(dict.fromkeys(failures))})"
-        return {"reason": reason}
+        for ats in company.get("_ats_order", ATS_ORDER):
+            for board in slugs:
+                result = probe(ats, board, "verified slug")
+                if result:
+                    return result
+        return miss()
     finally:
         if own:
             session.close()
@@ -438,7 +482,8 @@ def verify_owners(by_key: dict[str, dict], cache_dir: Path, workers: int = 8,
 
     def check(item):
         key, entry, _ = item
-        return owns(session, entry["ats"], entry["board"], entry["company"], entry.get("website", ""))
+        return owns(session, entry["ats"], entry["board"], entry["company"], entry.get("website", ""),
+                    **({"aliases": entry["aliases"]} if entry.get("aliases") else {}))
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for (key, entry, cached), owner in zip(todo, pool.map(check, todo)):
@@ -461,6 +506,16 @@ def verify_owners(by_key: dict[str, dict], cache_dir: Path, workers: int = 8,
     return stats
 
 
+def _website_failure(reason: str) -> bool:
+    return any(f"{page}: {error}" in reason
+               for page in ("careers page", "1-hop page")
+               for error in ("ConnectionError", "SSLError", "ConnectTimeout", "ReadTimeout", "Timeout"))
+
+
+def _seed_fields(seed: dict) -> dict:
+    return {k: v for k, v in seed.items() if not k.startswith("_") and not k.startswith("retry_")}
+
+
 def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: int = 8,
           deny_countries: tuple[str, ...] = ("in", "bd"), hq_lookup=None,
           db_path: Path | None = None, seeds_file: Path | None = None,
@@ -481,6 +536,9 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
         for s in seed_list:
             if s.get("company"):
                 clean_name = str(s["company"]).rstrip("> \t\r\n").strip()
+                matching = next((seed for seed in seeds if normalize_company(seed["company"]) == normalize_company(clean_name)), None)
+                if matching is not None:
+                    matching.update({k: s[k] for k in ("ats", "board", "aliases", "website") if k in s})
                 if normalize_company(clean_name) not in existing_keys:
                     seeds.append({
                         "company": clean_name,
@@ -490,6 +548,7 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
                         "hires": "worldwide",
                         "source": "seeds_yml",
                         "why": s.get("why", ""),
+                        **{k: s[k] for k in ("ats", "board", "aliases") if k in s},
                     })
                     existing_keys.add(normalize_company(clean_name))
 
@@ -552,9 +611,13 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
     failures: Counter[str] = Counter()
     pending: list[tuple[dict, Path, int]] = []
     today_str = date.today().isoformat()
+    counts = Counter(c.get("ats") for c in current)
+    ats_order = sorted(ATS_ORDER, key=lambda ats: (-counts[ats], ATS_ORDER.index(ats)))
+    limited_pending = []
 
     for seed in seeds:
         key = normalize_company(seed["company"])
+        seed["_ats_order"] = ats_order
         existing = by_key.get(key)
         seed["hq_country"] = _hq(existing or seed, hq_lookup)
 
@@ -569,9 +632,17 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
             by_key.pop(key, None)
             continue
 
-        if existing and existing.get("ats") and existing.get("board"):
+        override = bool(seed.get("ats") and seed.get("board"))
+        if existing and existing.get("ats") and existing.get("board") and (
+            not override or (existing["ats"], existing["board"]) == (seed["ats"], seed["board"])
+        ):
+            if seed.get("aliases"):
+                existing["aliases"] = seed["aliases"]
             stats["resolved"] += 1
             continue
+
+        if override:
+            by_key.pop(key, None)
 
         cached = cache_dir / f"{key}.json"
         cached_result = None
@@ -581,11 +652,22 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
             except Exception:
                 cached_result = None
 
+        if override and (cached_result or {}).get("seed_override") != [seed["ats"], seed["board"]] and (
+            (cached_result or {}).get("ats"), (cached_result or {}).get("board")
+        ) != (seed["ats"], seed["board"]):
+            cached_result = None
+
         if cached_result:
             if cached_result.get("ats"):
-                by_key[key] = {**seed, **{k: cached_result[k] for k in ("ats", "board")}, "added": today_str}
+                by_key[key] = {**_seed_fields(seed), **{k: cached_result[k] for k in ("ats", "board")}, "added": today_str}
                 stats["resolved"] += 1
                 stats["cached"] += 1
+                continue
+            if cached_result.get("status") == "limited" or "rate limited" in str(cached_result.get("reason", "")):
+                for field in ("retry_probes", "retry_trusted"):
+                    if field in cached_result:
+                        seed[field] = cached_result[field]
+                limited_pending.append((seed, cached, 1))
                 continue
             if cached_result.get("status") == "dead":
                 stats["failed"] += 1
@@ -594,10 +676,7 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
                 continue
 
             reason_str = str(cached_result.get("reason", ""))
-            is_transient = cached_result.get("status") == "transient" or any(err in reason_str for err in (
-                "HTTPError 5", "500", "502", "503", "504",
-                "ConnectionError", "SSLError", "ConnectTimeout", "ReadTimeout", "Timeout", "rate limited"
-            ))
+            is_transient = _website_failure(reason_str)
             attempts = cached_result.get("attempts", 1)
             last_attempt = cached_result.get("last_attempt")
 
@@ -627,6 +706,8 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
 
         pending.append((seed, cached, 1))
 
+    pending.extend(limited_pending)
+
     owners = verify_owners(by_key, cache_dir, workers, known={normalize_company(c["company"]) for c in current})
     stats["resolved"] -= owners["dropped"]
     stats["owner_check"] = owners
@@ -647,15 +728,18 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
             except Exception as exc:
                 result = {"reason": f"resolver error: {type(exc).__name__}"}
 
+            if seed.get("ats") and seed.get("board"):
+                result["seed_override"] = [seed["ats"], seed["board"]]
+            result["resolver_version"] = 2
             result["attempts"] = attempts
             result["last_attempt"] = today_str
             reason_str = str(result.get("reason", ""))
             if not result.get("ats"):
-                is_transient = any(err in reason_str for err in (
-                    "HTTPError 5", "500", "502", "503", "504",
-                    "ConnectionError", "SSLError", "ConnectTimeout", "ReadTimeout", "Timeout", "rate limited"
-                ))
-                if is_transient:
+                is_transient = _website_failure(reason_str)
+                if "rate limited" in reason_str:
+                    result["status"] = "limited"
+                    result["attempts"] = 0
+                elif is_transient:
                     result["status"] = "dead" if attempts >= max_attempts else "transient"
                 else:
                     result["status"] = "miss"
@@ -663,7 +747,7 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
             cached.write_text(json.dumps(result))
             if result.get("ats"):
                 by_key[normalize_company(seed["company"])] = {
-                    **seed, "ats": result["ats"], "board": result["board"], "added": today_str
+                    **_seed_fields(seed), "ats": result["ats"], "board": result["board"], "added": today_str
                 }
                 stats["resolved"] += 1
                 method = {"careers link": "careers_link", "database hint": "database_hint"}.get(

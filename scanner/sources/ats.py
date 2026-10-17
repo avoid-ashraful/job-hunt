@@ -26,18 +26,70 @@ log = logging.getLogger(__name__)
 USER_AGENT = "job-hunt-scanner (personal use)"
 _RATE_LOCK = threading.Lock()
 _NEXT_REQUEST: dict[str, float] = {}
+_BACKOFF: dict[str, float] = {}
+
+
+def _host(url: str) -> str:
+    return ".".join((urlparse(url).hostname or "").split(".")[-2:])
 
 
 def _pace(url: str) -> None:
-    """Space requests per provider: every <company>.recruitee.com shares Recruitee's rate limit."""
-    host = ".".join((urlparse(url).hostname or "").split(".")[-2:])
-    interval = 1.0 if host == "workable.com" else 0.25
+    """Recheck after sleeping so a concurrent 429 delays already-waiting threads too."""
+    host = _host(url)
+    while True:
+        with _RATE_LOCK:
+            now = time.monotonic()
+            wait = _NEXT_REQUEST.get(host, 0) - now
+            if wait <= 0:
+                interval = 1.0 if host == "workable.com" else 0.25
+                _NEXT_REQUEST[host] = now + max(interval, _BACKOFF.get(host, 0))
+                return
+        time.sleep(wait)
+
+
+def _feedback(url: str, response: requests.Response) -> None:
+    host = _host(url)
     with _RATE_LOCK:
-        now = time.monotonic()
-        scheduled = max(now, _NEXT_REQUEST.get(host, 0))
-        _NEXT_REQUEST[host] = scheduled + interval
-    if scheduled > now:
-        time.sleep(scheduled - now)
+        if response.status_code == 429:
+            delay = min(60, max(5, _BACKOFF.get(host, 0) * 2))
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    delay = float(retry_after)
+                except ValueError:
+                    try:
+                        delay = parsedate_to_datetime(retry_after).timestamp() - time.time()
+                    except (ValueError, TypeError, OverflowError):
+                        pass
+            delay = min(60, max(0, delay))
+            _BACKOFF[host] = max(5, delay)
+            _NEXT_REQUEST[host] = max(_NEXT_REQUEST.get(host, 0), time.monotonic() + delay)
+        elif response.status_code < 400 and host in _BACKOFF:
+            delay = _BACKOFF[host] / 2
+            if delay < 0.25:
+                del _BACKOFF[host]
+            else:
+                _BACKOFF[host] = delay
+
+
+def _request(session: requests.Session, url: str, *, params: dict | None = None,
+             retries: int = 3, timeout: int = 12) -> requests.Response:
+    for attempt in range(retries):
+        _pace(url)
+        response = session.get(url, params=params, timeout=timeout)
+        _feedback(url, response)
+        if attempt + 1 < retries:
+            if response.status_code == 429:
+                continue
+            if response.status_code >= 500:
+                try:
+                    wait = float(response.headers.get("Retry-After") or 2 ** attempt)
+                except ValueError:
+                    wait = 2 ** attempt
+                time.sleep(min(8, max(0, wait)))
+                continue
+        return response
+    raise RuntimeError(f"ATS request failed: {url}")
 
 
 class _Text(HTMLParser):
@@ -61,48 +113,24 @@ def plain(value: str | None) -> str:
 
 def get(session: requests.Session, url: str, *, params: dict | None = None, retries: int = 3,
         timeout: int = 12) -> dict | list:
-    for attempt in range(retries):
-        _pace(url)
-        response = session.get(url, params=params, timeout=timeout)
-        if response.status_code == 429 or response.status_code >= 500:
-            if attempt + 1 < retries:
-                try:
-                    wait = float(response.headers.get("Retry-After") or 2 ** attempt)
-                except ValueError:
-                    wait = 2 ** attempt
-                time.sleep(min(8, max(0, wait)))
-                continue
-        response.raise_for_status()
-        return response.json()
-    raise RuntimeError(f"ATS request failed: {url}")
+    response = _request(session, url, params=params, retries=retries, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
 
 
 def get_text(session: requests.Session, url: str, *, params: dict | None = None, retries: int = 3,
              timeout: int = 12) -> str:
-    for attempt in range(retries):
-        _pace(url)
-        response = session.get(url, params=params, timeout=timeout)
-        if response.status_code == 429 or response.status_code >= 500:
-            if attempt + 1 < retries:
-                try:
-                    wait = float(response.headers.get("Retry-After") or 2 ** attempt)
-                except ValueError:
-                    wait = 2 ** attempt
-                time.sleep(min(8, max(0, wait)))
-                continue
-        response.raise_for_status()
-        return response.text
-    raise RuntimeError(f"ATS request failed: {url}")
+    response = _request(session, url, params=params, retries=retries, timeout=timeout)
+    response.raise_for_status()
+    return response.text
 
 
 def workable_markdown(session: requests.Session, board: str) -> list[dict]:
     """Use Workable's small public feed when its widget API is rate limited."""
     url = f"https://apply.workable.com/{quote(board, safe='')}/jobs.md"
-    _pace(url)
-    response = session.get(url, timeout=10)
-    response.raise_for_status()
+    text = get_text(session, url, retries=2, timeout=7)
     rows = []
-    for line in response.text.splitlines():
+    for line in text.splitlines():
         if not line.startswith("|") or "[View]" not in line:
             continue
         cols = [x.strip() for x in line.split("|")]
