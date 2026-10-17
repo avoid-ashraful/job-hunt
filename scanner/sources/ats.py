@@ -19,6 +19,7 @@ from urllib.parse import quote, urlparse
 import requests
 import yaml
 
+from scanner import board_health
 from scanner.dedup import normalize_company, normalize_url
 from scanner.models import Job
 from scanner.sources import _more_ats
@@ -503,6 +504,7 @@ def _record(raw: dict, company: dict, cfg: dict, session: requests.Session) -> J
 def fetch_board(company: dict, cfg: dict) -> list[Job]:
     """One company is an isolation boundary: failures only hide that company's jobs."""
     ats, board = company["ats"].lower(), company["board"]
+    health_dir = Path(cfg["health_dir"]) if cfg.get("health_dir") else None
     session = requests.Session()
     session.headers["User-Agent"] = USER_AGENT
     if ats == "workable":
@@ -545,6 +547,7 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
                     time.sleep(cfg.get("request_delay_s", 0.2))
                     params["offset"] = offset
                     raws.extend(_items(get(session, url, params=params), ats))
+        board_health.record(health_dir, ats, board, jobs=len(raws))
         out = []
         for raw in raws:
             try:
@@ -554,6 +557,9 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
                 log.warning("ATS %s/%s posting skipped: %s", ats, board, exc)
         return out
     except Exception as exc:
+        response = getattr(exc, "response", None)
+        error = response.status_code if response is not None else type(exc).__name__
+        board_health.record(health_dir, ats, board, error=error)
         log.warning("ATS %s/%s failed: %s", ats, board, exc)
         return []
     finally:
@@ -569,7 +575,7 @@ def fetch(cfg: dict, days: int) -> Iterator[Job]:
     data = yaml.safe_load(path.read_text()) or {}
     companies = data.get("companies", []) if isinstance(data, dict) else data
     denied = {str(x).lower() for x in cfg.get("hq_deny_countries", ["in", "bd"])}
-    companies = [c for c in companies if c.get("ats") and c.get("board") and str(c.get("hq_country") or "").lower() not in denied]
+    companies = [c for c in companies if c.get("status") != "inactive" and c.get("ats") and c.get("board") and str(c.get("hq_country") or "").lower() not in denied]
     with ThreadPoolExecutor(max_workers=min(8, max(1, cfg.get("workers", 5)))) as pool:
         futures = {pool.submit(fetch_board, c, cfg): c for c in companies}
         for future in as_completed(futures):
