@@ -72,14 +72,18 @@ class LocationRules:
         self.ignore = re.compile(cfg.get("ignore_sentence", r"(?!x)x"), re.I)
         self.geo = re.compile(cfg["geo"], re.I)
         self.max_snippet_chars = cfg.get("max_snippet_chars", 1500)
+        self.residence_rules = set(cfg.get("residence_rules", []))
+        self.residence_zone = re.compile(cfg.get("residence_zone_lock", r"(?!x)x"), re.I)
 
-    def _place_kind(self, m: re.Match) -> str:
+    def _place_kind(self, m: re.Match, rule: str = "") -> str:
         """lock / candidate / timezone / neutral for the place a lock rule captured."""
         place = _place(m)
         if self.neutral_place.search(place):
             return "neutral"
         if self.candidate_place.search(place):
             return "candidate"
+        if rule in self.residence_rules and self.residence_zone.search(m.group(0)):
+            return "lock"  # "must reside in the Eastern time zone" means living there; "located in" stays timezone
         if re.match(r"(?:an?\s+|the\s+)?(?:\w+\s+){0,2}time ?zones?\b", place, re.I):
             return "timezone"  # "located in a US time zone" is a working-hours constraint
         if self.geo.search(place):
@@ -97,7 +101,7 @@ class LocationRules:
             perk = bool(self.perk.search(sent))
             for name, rx in self.lock.items():
                 for m in rx.finditer(sent):
-                    kind = self._place_kind(m)
+                    kind = self._place_kind(m, name)
                     hit = hit or (kind != "neutral" and not (perk and kind == "candidate"))
                     if kind == "lock":
                         locks.append((f"lock.{name}", sent, _place(m)))

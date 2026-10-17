@@ -6,7 +6,8 @@ candidate:
   timezone: Asia/Dhaka
   # freehire region tags compatible with the candidate. A job whose text is silent about
   # location stays in Check with these tags (or none); otherwise it's a "long shot".
-  tag_regions_ok: [global, apac]
+  tag_regions_ok: [global, apac]   # ...unless the source pins the job to other countries (apac + India)
+  country_code: bd                 # ISO code matched against the source's country tags
   company_priors: vendor/remote-jobs/src/companies   # remoteintech: companies that hire worldwide
   resume: private/profile/resume.pdf
 
@@ -45,7 +46,7 @@ filters:
     - '\b(data (engineer|scientist|analyst)|analytics)\b'
     - '\b(embedded|firmware|hardware)\b'
     - '\b(salesforce|servicenow|sap|dynamics)\b'
-    - '\b(designer|sales|solutions? engineer|support engineer|customer)\b'
+    - '\b(designer|sales|marketing|solutions? engineer|support engineer|customer)\b'
     - '\b(junior|jr\.?|intern|internship|graduate|new grad|entry[\s-]level|apprentice|trainee)\b'
     - '\bassociate (software )?(engineer|developer)\b'
     - '\b(manager|director|head of|vp|vice president)\b'
@@ -69,6 +70,7 @@ filters:
       - '\bjava\b(?!script)'
       - '\b(node(\.?js)?|nest\.?js|ruby|rails|php|laravel|scala|kotlin|elixir|rust)\b'
       - '(\.net\b|\bc#|c\+\+)'
+      - '\b(rpg|ibm i|as/?400|cobol|abap)\b'
     other_language_skill_tags: [java, go, golang, ruby, php, csharp, dotnet, scala, kotlin, elixir, rust, cpp, nodejs]
     strong: [django, drf, fastapi, celery, postgres, redis, aws, rabbitmq, clickhouse,
              elasticsearch, docker, terraform, opentofu, opentelemetry, llm, rag, bedrock]
@@ -91,6 +93,10 @@ filters:
     security_clearance:
       - '\b(security|secret|ts/sci|top secret|public trust) clearance\b'
       - '\bclearance (is )?required\b'
+    ai_gig:                     # task-paid AI-lab coding/evaluation gigs posted as jobs
+      - '\btask[\s-]based (?:compensation|pay)\b'
+      - '\b(?:with|for) (?:a )?leading ai labs?\b'
+      - '\b\d{2,4}\+? openings\b'
     w2_only:
       - '\bw-?2\b.{0,25}\bonly\b'
       - '\bonly\b.{0,25}\bw-?2\b'
@@ -99,9 +105,10 @@ filters:
     companies: []               # matched against company name and slug, whole words
     company_types: [agency, outsource, outstaff]
     domains: [gambling, crypto]
-    title_keywords: ['ai trainer', 'ai training', 'annotation', 'rlhf', 'data labell?ing', 'freelance']
+    title_keywords: ['ai trainer', 'ai training', 'annotation', 'rlhf', 'data labell?ing', 'freelance', 'ai evaluation', 'evaluation expert',
+                     'github contributor', '(?:open|general|spontaneous) application', 'talent (?:pool|community|network)', 'future opportunit', 'expression of interest']
     # staffing / talent marketplaces and agency-like company names (matched on the company name)
-    company_name_keywords: ['\bagency\b', '\bstaffing\b', '\brecruit\w*', '\btalents?\b', '\boutsourc\w*', '\bturing\b', '\bproxify\b', '\btoptal\b', '\bg2i\b', '\bbraintrust\b', '\bandela\b', '\barc\.dev\b', '\blemon\.io\b', '\bupwork\b', '\bwesource\b', '\bcrossover\b']
+    company_name_keywords: ['\bjobgether\b', '\bjobs for humanity\b', '\bagency\b', '\bstaffing\b', '\brecruit\w*', '\btalents?\b', '\boutsourc\w*', '\bturing\b', '\bproxify\b', '\btoptal\b', '\bg2i\b', '\bbraintrust\b', '\bandela\b', '\barc\.dev\b', '\blemon\.io\b', '\bupwork\b', '\bwesource\b', '\bcrossover\b']
     summary_keywords: ['\b(defen[cs]e contractor|military|weapons?|munitions)\b', '\b(adult|porn)\b']
 
   non_english: flag             # keep but tag
@@ -119,6 +126,10 @@ rules:
     perk: '\b(?:per year|a year|each year|per annum|weeks? (?:a|per|each)|days (?:a|per|each) year|workation|work from anywhere (?:policy|program|weeks?)|for up to \d+\s+(?:weeks?|months?|days))\b'
     # Legal boilerplate is never location evidence ("no lie detector tests to applicants in any location").
     ignore_sentence: '\b(?:lie detector|polygraph|equal (?:employment )?opportunity|discriminat\w*|pay transparency|privacy (?:notice|policy)|ccpa|gdpr|e-verify|reasonable accommodation|background check)\b'
+    # Living in a US/NA/EU time zone is a residence requirement, not working hours:
+    # "must reside in the Eastern or Central time zone" is a lock ("must be located in a US time zone" stays timezone).
+    residence_rules: [must_reside, open_to, candidate_based]
+    residence_zone_lock: '\b(?:reside|residing|resident|live|living)\b[^.;\n]{0,30}\b(?:eastern|central|mountain|pacific|est|cst|mst|pst|edt|cdt|pdt|us|u\.s|north american?|american|european|cet)\b[^.;\n]{0,40}\btime ?zones?\b'
     timezone_place: '\b(time ?zones?|utc|gmt|est|pst|cet|eastern|pacific|central) '
     lock:
       must_reside: '\b(?:must|need to|needs to|required to|should|have to|has to|will need to)\s+(?:currently\s+)?(?:be\s+)?(?:physically\s+)?(?:located|based|residing|reside|live|living|a\s+(?:legal\s+)?resident)\s+(?:in|within|of)\s+(?P<place>[^.;:\n]{2,160})'
@@ -161,6 +172,28 @@ rules:
     cue: '\b(reside|residing|resident|located|based in|based out of|live in|living in|hire|hiring|employ|eligib\w*|open to|countries|work from|time ?zones?|relocat\w*)\b'
     geo: '\b(u\.?s\.?a?|united states|america[s]?|canada|uk|united kingdom|eu|eea|emea|europe(an)?|latam|latin america|south america|apac|asia|africa|middle east|mena|india|pakistan|bangladesh|philippines|vietnam|indonesia|singapore|australia|new zealand|brazil|mexico|argentina|colombia|chile|peru|germany|france|spain|portugal|poland|netherlands|ireland|italy|sweden|norway|denmark|finland|switzerland|austria|belgium|czech\w*|romania|bulgaria|ukraine|serbia|croatia|greece|turkey|israel|egypt|nigeria|kenya|south africa|japan|korea|china|taiwan|hong kong|malaysia|thailand|uae|dubai|saudi|qatar|deutschland|україн\w*|рф|росси\w*|following (?:states|countries|locations|regions|cities)|entit(?:y|ies))\b'
     max_snippet_chars: 1500
+  ghost:
+    # Ghost postings: reposted, mass-posted, evergreen or re-posted by a third party (scanner/ghost.py).
+    # Signals add up: score >= drop_at is dropped; >= flag_at is kept, flagged, and can't be in Apply.
+    drop_at: 3
+    flag_at: 2
+    weights: {freehire_evergreen: 3, fake_freshness: 3, reposted: 2, mass_posted: 1, evergreen_text: 2,
+              scraped_repost: 2, aggregator_source: 1, thin_description: 1}
+    repost_gap_days: 7          # a copy first seen this much earlier counts as a repost, not a concurrent copy
+    repost_min: 2               # reposts of one role (company + title) before it counts
+    mass_min: 5                 # concurrent copies of one role (often one req in several countries: weak alone)
+    min_description_chars: 400
+    # sources that re-post or rewrite other sites' postings (the part of the freehire id before ':')
+    aggregator_sources: 'whatjobs(?:-\w+)?|adzuna|jobleads|torre|startupjobs|energyjobline|telegram|jobstash|arbeitnow'
+    evergreen_text:
+      - '\b(?:this|the) (?:is an? )?(?:evergreen|pipeline) (?:role|position|requisition|posting|opening|req)\b'
+      - '\bevergreen (?:role|position|requisition|posting|opening|req)\b'
+      - '\b(?:no|not an?) (?:current|immediate|active) (?:opening|vacanc\w+|position)\b'
+      - '\b(?:this|the) (?:posting|position|role|listing|requisition|vacancy) (?:is )?(?:for|to build|intended to build) (?:our |a )?(?:talent|candidate) (?:pool|pipeline|community|network)'
+      - '\bcontingent (?:up)?on (?:a |the )?(?:contract|funding) award\b'
+    scraped_repost_text:
+      - 'Real-time AI thinking|\bMatch and rank\b|How you fit the job|Meet your team Comments'
+      - '\boriginally posted (?:on|at)\b'
   role:
     agency:
       for_our_client: '\b(?:for|on behalf of)\s+(?:our|a|one of our)\s+(?:client|customer|partner)s?\b'
@@ -176,6 +209,12 @@ rules:
       core: ['\bpython\b', '\bdjango\b', '\bfastapi\b']
       strong: ['\bdjango\b', '\bdjango rest\b|\bdrf\b', '\bfastapi\b', '\bcelery\b', '\bpostgres\w*\b', '\bredis\b', '\baws\b', '\brabbitmq\b', '\bclickhouse\b', '\belasticsearch\b', '\bdocker\b', '\bterraform\b|\bopentofu\b', '\bkubernetes\b', '\bopentelemetry\b|\bgrafana\b', '\bllm\b|\brag\b|\bbedrock\b|\blangchain\b', '\bmicroservices?\b', '\bkafka\b', '\breact\b', '\btypescript\b']
     min_fit_for_apply: 3
+
+liveness:
+  # right before the report, ask the employer's ATS (Greenhouse, Lever, Ashby, Workable, SmartRecruiters;
+  # else the posting page) whether each job is still open. Only a clear 404/410 or a missing Ashby id drops it.
+  enabled: true
+  workers: 8
 
 dedup:
   # a job is new only if none of these were reported before:

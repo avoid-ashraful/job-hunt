@@ -52,6 +52,15 @@ def fingerprint(company_key: str, title: str) -> str:
     return f"{company_key}|{normalize_title(title)}"
 
 
+def description_fingerprint(job) -> str | None:
+    """Title + the start of the description: the same job posted under two company names
+    (an ATS tenant name vs the brand, a parent vs a subsidiary) has the same text."""
+    text = re.sub(r"[^a-z0-9]+", " ", job.description.lower()).split()
+    if len(text) < 60:  # too short to be distinctive
+        return None
+    return f"{normalize_title(job.title)}|{' '.join(text[:80])}"
+
+
 def seniority_level(title: str, enriched: str | None) -> str:
     for level, pattern in SENIORITY_FROM_TITLE:
         if pattern.search(title):

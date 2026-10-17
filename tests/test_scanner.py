@@ -174,6 +174,7 @@ def location_rules(cfg):
         ("Remote-first and flexible: work from anywhere, at your own pace.", "ambiguous"),
         ("We're a fully remote, globally distributed team.", "ambiguous"),
         ("You must be located in a US time zone.", "timezone"),
+        ("Candidates must reside in the Eastern or Central time zone.", "locked"),
     ],
 )
 def test_location_rules(location_rules, text, outcome):
@@ -337,3 +338,101 @@ def test_bare_work_from_anywhere_is_not_worldwide(evidence, kept):
     job = make_job(description=f"About us. {evidence}. Apply now.")
     r = check_evidence(job, {**BASE, "eligibility": "anywhere", "eligibility_evidence": evidence})
     assert (r["eligibility"] == "anywhere") is kept
+
+
+LONG_TEXT = "We build billing software in Python and Django for hospitals. " * 12
+
+
+@pytest.fixture
+def ghost_store(tmp_path):
+    from scanner.store import Store
+
+    return Store(tmp_path / "s.sqlite")
+
+
+def test_ghost_signals_add_up(cfg, ghost_store):
+    from scanner.ghost import GhostRules
+
+    ghosts = GhostRules(cfg["rules"]["ghost"], ghost_store.role_history)
+    real = make_job(description=LONG_TEXT)
+    assert ghosts.score(real) == (0, [])
+
+    evergreen = make_job(description=LONG_TEXT, reality={"class": "likely-evergreen", "repost_count": 1})
+    assert ghosts.score(evergreen)[0] >= ghosts.drop_at
+
+    # an aggregator copy alone is not a ghost; re-posted by a third party with its page chrome is
+    agg = make_job(id="torre::abc", description=LONG_TEXT)
+    assert ghosts.score(agg)[0] < ghosts.flag_at
+    scraped = make_job(id="torre::abd", description=LONG_TEXT + " Similar jobs Real-time AI thinking Match and rank")
+    assert ghosts.score(scraped)[0] >= ghosts.drop_at
+
+    pipeline = make_job(description=LONG_TEXT + " This is an evergreen requisition.")
+    score, signals = ghosts.score(pipeline)
+    assert ghosts.flag_at <= score < ghosts.drop_at and signals[0].startswith("evergreen_text")
+
+
+def test_ghost_reposts_and_mass_posting_come_from_history(cfg, ghost_store):
+    from scanner.ghost import GhostRules
+
+    ghosts = GhostRules(cfg["rules"]["ghost"], ghost_store.role_history)
+    for i, age in enumerate([40, 25]):  # the same role posted twice before under new ids
+        ghost_store.upsert(make_job(id=f"lever:acme:old{i}", first_seen_at=NOW - timedelta(days=age)), "2026-10-15")
+    for i in range(5):  # and sprayed five times now
+        ghost_store.upsert(make_job(id=f"lever:acme:now{i}", first_seen_at=NOW - timedelta(days=1)), "2026-10-15")
+    job = make_job(id="lever:acme:new", description=LONG_TEXT)
+    assert ghost_store.role_history(job) == (2, 6)
+    score, signals = ghosts.score(job)
+    assert score >= ghosts.drop_at
+    assert [s.split(" ")[0] for s in signals] == ["reposted", "mass_posted"]
+
+
+def test_same_job_under_two_company_names_is_reported_once(ghost_store):
+    brand = make_job(id="workday:verisk:1", company="Verisk", company_key="verisk", description=LONG_TEXT)
+    tenant = make_job(id="oracle:fa-ewmy:1", url="https://fa-ewmy.oraclecloud.com/1", company="fa-ewmy",
+                      company_key="fa-ewmy", description=LONG_TEXT)
+    ghost_store.mark_reported(brand, "2026-10-15")
+    assert "same title+text" in ghost_store.already_reported(tenant)
+
+
+def test_liveness_reads_each_ats_and_only_trusts_clear_answers(monkeypatch):
+    from scanner import liveness
+
+    calls = []
+
+    class Resp:
+        def __init__(self, code, body=None):
+            self.status_code, self.ok, self._body = code, code < 400, body
+
+        def json(self):
+            return self._body
+
+    def fake_get(url, **kw):
+        calls.append(url)
+        if "ashbyhq" in url:
+            return Resp(200, {"jobs": [{"id": "open-id"}]})
+        if url.endswith("/gone"):
+            return Resp(404)
+        if url.endswith("/busy"):
+            return Resp(429)
+        return Resp(200)
+
+    monkeypatch.setattr(liveness.requests, "get", fake_get)
+    liveness._ashby_board.cache_clear()
+    assert liveness.check(make_job(id="greenhouse:acme:gone")) == liveness.CLOSED
+    assert calls[-1] == "https://boards-api.greenhouse.io/v1/boards/acme/jobs/gone"
+    assert liveness.check(make_job(id="lever:acme:busy")) == liveness.UNKNOWN
+    assert liveness.check(make_job(id="ashby:acme:open-id")) == liveness.OPEN
+    assert liveness.check(make_job(id="ashby:acme:other-id")) == liveness.CLOSED
+    assert liveness.check(make_job(id="himalayas::x", url="https://himalayas.app/x/gone")) == liveness.CLOSED
+
+
+@pytest.mark.parametrize("title", ["Software Engineer (GitHub Contributor)", "Senior Software Engineer | AI Evaluation",
+                                   "Marketing Specialist (Backend & Digital Ads)", "Open Application - Backend Engineer",
+                                   "Senior Back-End Developer (RPG / IBM i)"])
+def test_gig_and_non_engineering_titles_dropped(filters, title):
+    assert filters.evaluate(make_job(title=title)) is not None
+
+
+def test_task_paid_ai_lab_gigs_dropped(filters):
+    gig = make_job(description="Python experts to work with a leading AI lab. Task-based compensation, 100 openings.")
+    assert "ai_gig" in filters.evaluate(gig)

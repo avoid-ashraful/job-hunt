@@ -19,9 +19,11 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from scanner.companies import load_region_map
-from scanner.dedup import collapse_by_seniority, fingerprint
+from scanner import liveness
+from scanner.dedup import collapse_by_seniority, description_fingerprint, fingerprint
 from scanner.eligibility import NEGATIVE, POSITIVE, Screener, check_evidence
 from scanner.filters import Filters
+from scanner.ghost import GhostRules
 from scanner.models import Job
 from scanner.report import reason_bucket, write_drop_log, write_report
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
@@ -95,12 +97,25 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         if reason := store.already_reported(job):
             drop(job, "dedup", "already_reported", reason)
             continue
-        fp = fingerprint(job.company_key, job.title)
-        if fp in seen_fp:
+        fps = {fingerprint(job.company_key, job.title), description_fingerprint(job)} - {None}
+        if fps & seen_fp:
             drop(job, "dedup", "same_run_duplicate", "already reported (duplicate posting in this run)")
             continue
-        seen_fp.add(fp)
+        seen_fp |= fps
         new.append(job)
+
+    # 3b. ghost jobs: reposted, mass-posted, evergreen or re-posted by a third party
+    ghost_cfg = cfg["rules"]["ghost"]
+    ghosts = GhostRules(ghost_cfg, lambda j: store.role_history(j, ghost_cfg.get("repost_gap_days", 7)))
+    real = []
+    for job in new:
+        score, signals = ghosts.score(job)
+        job.screen["ghost"] = (score, signals)
+        if score >= ghosts.drop_at:
+            drop(job, "ghost", "ghost", f"ghost job (score {score}): {', '.join(signals)}")
+        else:
+            real.append(job)
+    new = real
 
     # 4. role rules: agency wording, working language, frontend-heavy fullstack; fit score
     role_rules = RoleRules(cfg["rules"]["role"])
@@ -176,7 +191,11 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     # 7. buckets: clear eligibility + good fit = Apply; everything else kept = Check
     min_fit = cfg["rules"]["role"].get("min_fit_for_apply", 3)
     for job in eligible:
-        if job.screen["fit"] >= min_fit:
+        ghost_score, signals = job.screen["ghost"]
+        if ghost_score >= ghosts.flag_at:
+            job.bucket = "check"
+            job.screen["why"] = "eligible, but may be a ghost posting"
+        elif job.screen["fit"] >= min_fit:
             job.bucket = "apply"
         else:
             job.bucket = "check"
@@ -185,21 +204,36 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     # stay in Check; jobs whose only signal is a region tag that excludes the candidate are long shots.
     priors = load_region_map(ROOT / cfg["candidate"].get("company_priors", "vendor/remote-jobs/src/companies"))
     ok_tags = set(cfg["candidate"].get("tag_regions_ok", ["global"]))
+    code = cfg["candidate"].get("country_code", "").lower()
     for job in check:
         prior = priors.get(job.company_key)
         if prior:
             job.screen["prior"] = f"remoteintech lists this company as hiring: {prior}"
-        if prior == "worldwide" or not job.regions or ok_tags & set(job.regions):
+        # a region tag like apac is compatible, unless the source pinned it to other countries (apac + India)
+        tag_ok = "global" in job.regions or (ok_tags & set(job.regions) and (not job.countries or code in job.countries))
+        if prior == "worldwide" or not job.regions or tag_ok:
             job.bucket = "check"
         else:
             job.bucket = "longshot"
-            job.screen["why"] = (job.screen.get("why", "") + f"; tagged {', '.join(job.regions)} only").lstrip("; ")
+            where = ", ".join(job.countries) if ok_tags & set(job.regions) else ", ".join(job.regions)
+            job.screen["why"] = (job.screen.get("why", "") + f"; tagged {where} only").lstrip("; ")
     kept = eligible + check
 
     # 8. keep only the most senior opening per company + role family
     kept, lower = collapse_by_seniority(kept, store.reported_best(cfg["dedup"]["collapse_window_days"]))
     for job, reason in lower:
         drop(job, "collapse", "lower_seniority", reason)
+
+    # 9. ask the employer's ATS whether each posting is still open
+    if cfg.get("liveness", {}).get("enabled", True) and kept:
+        status = liveness.check_all(kept, cfg.get("liveness", {}).get("workers", 8))
+        open_jobs = []
+        for job in kept:
+            if status[job.id] == liveness.CLOSED:
+                drop(job, "liveness", "closed", "closed: the posting is gone from the employer's site")
+            else:
+                open_jobs.append(job)
+        kept = open_jobs
 
     drop_counts = Counter(reason_bucket(r) for _, r in dropped)
     stats = {"fetched": len(fetched), "passed": len(passed), "ambiguous": len(ambiguous),

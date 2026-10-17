@@ -6,10 +6,10 @@ import hashlib
 import json
 import sqlite3
 from dataclasses import asdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from scanner.dedup import fingerprint
+from scanner.dedup import description_fingerprint, fingerprint
 from scanner.models import Job
 
 def job_ref(job_id: str) -> str:
@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS reported (
     ref TEXT
 );
 CREATE INDEX IF NOT EXISTS reported_url ON reported(url);
+CREATE INDEX IF NOT EXISTS jobs_fp ON jobs(fingerprint);
 CREATE INDEX IF NOT EXISTS reported_fp ON reported(fingerprint);
 -- self-learning logs: every decision, every LLM call, every spot-check, every piece of feedback
 CREATE TABLE IF NOT EXISTS decisions (
@@ -100,6 +101,9 @@ class Store:
         cols = {row[1] for row in self.db.execute("PRAGMA table_info(reported)")}
         if "ref" not in cols:
             self.db.execute("ALTER TABLE reported ADD COLUMN ref TEXT")
+        if "desc_fp" not in cols:
+            self.db.execute("ALTER TABLE reported ADD COLUMN desc_fp TEXT")
+        self.db.execute("CREATE INDEX IF NOT EXISTS reported_desc_fp ON reported(desc_fp)")
 
     def is_empty(self) -> bool:
         """No completed (non-dry) run yet, so the next run should backfill."""
@@ -117,13 +121,39 @@ class Store:
     def already_reported(self, job: Job) -> str | None:
         """Which identity matched a previously reported job, if any."""
         row = self.db.execute(
-            "SELECT id, url, fingerprint, reported_on FROM reported WHERE id = ? OR url = ? OR fingerprint = ? LIMIT 1",
-            (job.id, job.url, fingerprint(job.company_key, job.title)),
+            "SELECT id, url, fingerprint, reported_on FROM reported"
+            " WHERE id = ? OR url = ? OR fingerprint = ? OR desc_fp = ? LIMIT 1",
+            (job.id, job.url, fingerprint(job.company_key, job.title), description_fingerprint(job)),
         ).fetchone()
         if not row:
             return None
-        how = "same id" if row[0] == job.id else "same link" if row[1] == job.url else "same company+title"
+        how = ("same id" if row[0] == job.id else "same link" if row[1] == job.url
+               else "same company+title" if row[2] == fingerprint(job.company_key, job.title) else "same title+text")
         return f"already reported on {row[3]} ({how})"
+
+    def role_history(self, job: Job, gap_days: int = 7) -> tuple[int, int]:
+        """(reposts, concurrent) for the job's company+title among every posting ever fetched.
+
+        reposts: other ids first seen more than `gap_days` before this one (the role was closed
+        and re-posted, or re-posted to look fresh); concurrent: copies first seen within `gap_days`
+        of it, this one included.
+        """
+        anchor = job.first_seen_at or job.posted_at
+        if anchor is None:
+            return 0, 1
+        reposts, concurrent = 0, 1
+        for other_id, seen in self.db.execute(
+            "SELECT id, json_extract(payload, '$.first_seen_at') FROM jobs WHERE fingerprint = ? AND id != ?",
+            (fingerprint(job.company_key, job.title), job.id),
+        ):
+            if not seen:
+                continue
+            days = (anchor - datetime.fromisoformat(seen)).total_seconds() / 86400
+            if days > gap_days:
+                reposts += 1
+            elif abs(days) <= gap_days:
+                concurrent += 1
+        return reposts, concurrent
 
     def reported_best(self, window_days: int) -> dict[tuple[str, str], tuple[int, str]]:
         since = (date.today() - timedelta(days=window_days)).isoformat()
@@ -138,10 +168,11 @@ class Store:
 
     def mark_reported(self, job: Job, today: str) -> None:
         self.db.execute(
-            """INSERT OR IGNORE INTO reported (id, url, fingerprint, company_key, family, rank, title, reported_on, ref)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT OR IGNORE INTO reported (id, url, fingerprint, company_key, family, rank, title, reported_on, ref,
+                                              desc_fp)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (job.id, job.url, fingerprint(job.company_key, job.title), job.company_key, job.family, job.rank,
-             job.title, today, job_ref(job.id)),
+             job.title, today, job_ref(job.id), description_fingerprint(job)),
         )
 
     def log_run(self, run_at: str, fetched: int, passed: int, new: int, reported: int, report: str,

@@ -42,7 +42,9 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
         evidence = sc.get("evidence") or ""
         evidence = f"“{evidence[:180]}”" if evidence else f"_tag only: {job.location or '-'}_"
         seen = f"{job.age_anchor:%b %d}" if job.age_anchor else ""
-        why_text = "; ".join(x for x in (sc.get("why", ""), sc.get("prior", "")) if x)
+        ghost_score, signals = sc.get("ghost") or (0, [])
+        ghost = f"⚠ possible ghost: {', '.join(signals)}" if ghost_score and signals else ""
+        why_text = "; ".join(x for x in (sc.get("why", ""), sc.get("prior", ""), ghost) if x)
         why = f" {_cell(why_text)} |" if with_why else ""
         lines.append(
             f"| `{job_ref(job.id)}` | {sc.get('fit', '')}/5 | {_cell(job.company)} | {_cell(job.title)} | {_cell(who)} | "
@@ -110,7 +112,7 @@ def reason_bucket(reason: str) -> str:
         return "region locked (rule)"
     if reason.startswith(("agency.", "language.", "role.")):
         return reason.split(":")[0]
-    for prefix in ("older than", "title excluded", "gig/excluded title", "no Python", "salary max",
+    for prefix in ("ghost job", "closed", "older than", "title excluded", "gig/excluded title", "no Python", "salary max",
                    "already reported", "lower seniority", "excluded company", "excluded domain",
                    "excluded industry", "company type", "employment type", "not seen live", "staffing/agency company",
                    "us_work_authorization", "security_clearance", "w2_only"):

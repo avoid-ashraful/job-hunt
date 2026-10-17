@@ -7,7 +7,7 @@ actually be hired from my country, and writes a short list of links to apply to.
 ## How it works
 
 ```
-fetch ─► hard filters ─► never-seen-before ─► role rules ─► location rules ─► AI (only if ambiguous) ─► most senior per company ─► daily list
+fetch ─► hard filters ─► never-seen-before ─► ghost check ─► role rules ─► location rules ─► AI (only if ambiguous) ─► most senior per company ─► still open? ─► daily list
 ```
 
 Rules first, AI last: deterministic parsers decide almost everything, and the AI is
@@ -21,10 +21,17 @@ relevant sentences, not the whole posting.
    stack (Python required unless the posting names no language), posting age
    (earliest of posted / first-seen), not seen live for 10 days, salary floor,
    employment and company type, industries, excluded companies, and hard drops
-   (US work authorization, clearance, W-2).
-3. **Never twice.** A job is new only if its ATS id, normalized link, and
-   company + normalized title were never reported. This catches reposts and the
-   same job listed on several boards.
+   (US work authorization, clearance, W-2, task-paid AI-lab gigs).
+3. **Never twice.** A job is new only if its ATS id, normalized link,
+   company + normalized title, and title + opening text were never reported. This
+   catches reposts, the same job listed on several boards, and one job posted under
+   two company names (e.g. an Oracle tenant name and the brand).
+   **Ghost check** (`rules.ghost`): weak signals add up to a score. They are
+   reposts of the same role under new ids (freehire's history and ours),
+   mass-posted copies, freehire's evergreen/fake-freshness verdicts, pipeline
+   wording, a third party re-posting the page, aggregator-only sources, and very
+   short descriptions. A high score drops the job. A medium score keeps it,
+   flagged ⚠, and out of Apply.
 4. **Role rules** (`rules.role`): agency/outsourcing wording, working language,
    frontend-heavy fullstack, plus a stack-based fit score (1–5).
 5. **Location rules** (`rules.location`): every sentence is matched against named
@@ -40,6 +47,9 @@ relevant sentences, not the whole posting.
    come from the description, or the job goes to Check. It also spot-checks a
    few rule decisions each run, which is how rule accuracy is measured.
 7. **Most senior opening per company + role family** (aware of the last 60 days).
+   **Still open?** (`liveness:`): each remaining job is checked against the
+   employer's ATS API (Greenhouse, Lever, Ashby, Workable, SmartRecruiters; other
+   sources: the posting page). Only a clear 404/410 drops it.
 8. **Output:** `private/jobs/YYYY-MM-DD.md` with three tiers:
    - ✅ **Apply**: the text confirms eligibility and the fit is good
    - 🟡 **Check**: not confirmed, but the tags are compatible or the company is known to hire worldwide
