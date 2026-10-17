@@ -16,7 +16,7 @@ sources:
     enabled: true
     base_url: https://freehire.me/api/v1
     # freehire category facets used for recall; titles are filtered locally below.
-    categories: [backend, fullstack, software_engineering, ai_engineering, ml_ai, architecture]
+    categories: [backend, fullstack, software_engineering, ai_engineering, ml_ai, architecture, devops, data_engineering, security]
     work_mode: remote
     seniority_exclude: [intern, junior]
     first_run_days: 21          # backfill window on an empty database
@@ -108,7 +108,7 @@ filters:
     title_keywords: ['ai trainer', 'ai training', 'annotation', 'rlhf', 'data labell?ing', 'freelance', 'ai evaluation', 'evaluation expert',
                      'github contributor', '(?:open|general|spontaneous) application', 'talent (?:pool|community|network)', 'future opportunit', 'expression of interest']
     # staffing / talent marketplaces and agency-like company names (matched on the company name)
-    company_name_keywords: ['\bjobgether\b', '\bjobs for humanity\b', '\bagency\b', '\bstaffing\b', '\brecruit\w*', '\btalents?\b', '\boutsourc\w*', '\bturing\b', '\bproxify\b', '\btoptal\b', '\bg2i\b', '\bbraintrust\b', '\bandela\b', '\barc\.dev\b', '\blemon\.io\b', '\bupwork\b', '\bwesource\b', '\bcrossover\b']
+    company_name_keywords: ['\bjobgether\b', '\bjobs for humanity\b', '\bagency\b', '\bstaffing\b', '\brecruit\w*', '\btalents?\b', '\boutsourc\w*', '\bturing\b', '\bproxify\b', '\btoptal\b', '\bbraintrust\b', '\bandela\b', '\barc\.dev\b', '\blemon\.io\b', '\bupwork\b', '\bwesource\b', '\bcrossover\b']
     summary_keywords: ['\b(defen[cs]e contractor|military|weapons?|munitions)\b', '\b(adult|porn)\b']
 
   non_english: flag             # keep but tag

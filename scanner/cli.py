@@ -27,7 +27,7 @@ from scanner.ghost import GhostRules
 from scanner.models import Job
 from scanner.report import reason_bucket, write_drop_log, write_report
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
-from scanner.sources import freehire
+from scanner import sources
 from scanner.store import Store
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -77,7 +77,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         days = src["first_run_days"] if store.is_empty() else src["daily_lookback_days"]
     log.info("fetching jobs first seen in the last %s days", days)
     fetched: dict[str, Job] = {}
-    for job in freehire.fetch(src, days):
+    for job in sources.fetch_all(cfg["sources"], days):
         fetched.setdefault(job.id, job)
     for job in fetched.values():
         store.upsert(job, today)
