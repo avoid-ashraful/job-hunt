@@ -257,6 +257,17 @@ def test_workday_hq_lookup_uses_board_landing(monkeypatch):
     assert calls[0] == "https://example.wd1.myworkdayjobs.com/Careers"
 
 
+def test_comeet_hq_lookup_uses_composite_board_landing(monkeypatch):
+    calls = network(monkeypatch, {
+        "https://www.comeet.com/jobs/example/12.003": '<a href="https://example.com/">Company</a>',
+        "https://example.com/": '<address>Berlin, Germany</address>',
+    })
+    posting = job(id="comeet:example|12.003:AB.CDE",
+                  url="https://www.comeet.com/jobs/example/12.003/backend/AB.CDE")
+    assert company_evidence.lookup(posting)[0] == "de"
+    assert calls[0] == "https://www.comeet.com/jobs/example/12.003"
+
+
 def test_malformed_company_page_cannot_abort_other_report_enrichment(monkeypatch, caplog):
     network(monkeypatch, {
         "https://example.com/": '<script type>untyped script</script>',

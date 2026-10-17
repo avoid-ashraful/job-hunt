@@ -180,7 +180,7 @@ def lookup(job: Job) -> tuple[str | None, str]:
         landing = job.url
         if identity:
             ats, board, ext = identity
-            if ats == "workday":
+            if ats in {"workday", "comeet"}:
                 from scanner.sources._more_ats import landing as board_landing
                 try:
                     landing = board_landing(ats, board)
