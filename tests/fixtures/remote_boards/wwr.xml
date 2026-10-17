@@ -1,0 +1,66 @@
+<item>
+      <title>Upgrade: AI Experience Engineer (Conversational AI)</title>
+      <region>Anywhere in the World</region>
+      <country />
+      <state />
+      <skills />
+      <category>Back-End Programming</category>
+      <type>Full-Time</type>
+      <description>
+
+&lt;p&gt;
+  &lt;strong&gt;Headquarters:&lt;/strong&gt; Canada (Remote)
+&lt;/p&gt;
+
+&lt;p&gt;&lt;span&gt;&lt;strong&gt;About the Role:&lt;/strong&gt;&lt;br&gt;&lt;br&gt;An AI Experience Engineer owns the full lifecycle of the journeys our customers have with Upgrade's AI agent on chat, voice and email: creation, optimization, edge case handling and containment growth. They build journeys in Sierra's no-code tooling, partner with Upgrade's product groups to bring their servicing flows to the agent, and are accountable for whether the agent resolves the customer's issue safely, accurately and without a human.&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;We are hiring an AI Experience Engineer to own Upgrade's customer-facing AI agent. You will sit between engineering, product and customer operations. You will turn servicing workflows, such as making a payment, checking loan details, updating an address or enabling autopay, into production journeys and keep improving them after launch. &lt;/span&gt;&lt;span&gt;You will build and own the journeys end to end, from first draft to steady state. The work is part builder, part analyst: design the flow, handle the edge cases, read the transcripts, and keep raising containment. Containment, CSAT, transfer quality and hallucination rate are your metrics.&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;Within your first year, you will own a portfolio of journeys across products (Personal Loans, Card, BNPL, HELOC, Deposits) and help set the standards for how Upgrade builds, tests and ships AI experiences.&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;&lt;strong&gt;Our Core Technologies&lt;/strong&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;Sierra Agent Studio (no-code journeys), Sierra simulations and conversation analytics, GraphQL and REST APIs (as journey tools), Genesys (contact center handoff), SumoLogic, Grafana, SQL, Javascript/Typescript, Claude and other LLM tools.&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;&lt;strong&gt;What You'll Do&lt;/strong&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Journey creation:&lt;/strong&gt; Design and build Sierra journeys in Agent Studio for chat, voice and email, from discovery with operations through production rollout&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Optimization:&lt;/strong&gt; Review transcripts, recordings and analytics every week, find where conversations fail or transfer, and ship fixes to journey logic, instructions and knowledge&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Edge case handling: &lt;/strong&gt;Map the unhappy paths (failed payments, mismatched identity, delinquent accounts, unsupported requests) and make sure each ends in a correct answer or a clean handoff&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Containment:&lt;/strong&gt; Own containment and CSAT targets per journey, run staged rollouts (1% → 100%), and prioritize the work that moves those numbers most&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Product partnership:&lt;/strong&gt; Work with product groups (Personal Loans, Card, BNPL, Deposits) to scope new journeys, keep journeys current as products change, and define the APIs the agent needs&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Safety and compliance:&lt;/strong&gt; Apply tiered authentication and step-up verification, verbatim compliance language and guardrails against hallucination and off-policy answers&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Handoffs:&lt;/strong&gt; Design transfers to human agents in Genesys with accurate summaries and auth context&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Testing:&lt;/strong&gt; Build simulation and regression suites so every journey change ships with evidence it did not break existing behavior&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Monitoring: &lt;/strong&gt;Watch latency, errors and drop-offs in SumoLogic and Grafana, and own the alerts&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Voice tuning:&lt;/strong&gt; Latency, filler phrases, interruptions, personality and tone&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• &lt;strong&gt;Sierra relationship: &lt;/strong&gt;Be the technical owner on our side, escalate platform issues and shape roadmap asks&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;&lt;strong&gt;What We Look For:&lt;/strong&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• 3–5 years of Frontend Software Engineering experience, or equivalent experience in Solutions Engineering, Conversational AI or Technical Product roles&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Working knowledge of how LLM agents behave: instructions, tool calls, knowledge retrieval, and where each one fails&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Experience building evaluations for non-deterministic systems: test sets, simulations, LLM-as-judge, regression gates&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Enough technical depth to read API specs, work with backend engineers on REST and GraphQL integrations, and reason about authorization and permission scopes&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Working knowledge of JavaScript/TypeScript, with the ability to build and maintain coded journeys and integrate APIs within conversational AI platforms.&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Product and customer mindset: you understand ops procedures, you read transcripts, care about tone, and measure success by whether the customer's problem got solved&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Ownership in production: rollouts, monitoring, log analysis and incident response&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Clear writing and the ability to work with non-engineers in operations, compliance and legal&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;&lt;strong&gt;Nice To Have:&lt;/strong&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Hands-on experience with Sierra Agent Studio, or a comparable no-code agent platform (Decagon, Ada, Kore.ai, Google CCAI, Amazon Lex/Connect)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Voice AI experience: speech-to-text, text-to-speech, latency tuning, barge-in handling&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Contact center systems such as Genesys, and agent handoff design&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Background in fintech or another regulated industry (UDAAP, FDCPA, TCPA, PCI, SOC 2)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Conversation design or UX writing experience&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;&lt;strong&gt;What We Offer You:&amp;nbsp;&lt;/strong&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Competitive salary ($140K-$180K CAN) and stock option plan&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Paid coverage of medical, dental and vision insurance&amp;nbsp;&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Flexible PTO&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Opportunities for professional growth and development&lt;br&gt;• Paid parental leave&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span&gt;• Health &amp;amp; wellness initiatives&lt;/span&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;To apply:&lt;/strong&gt; &lt;a href="https://weworkremotely.com/remote-jobs/upgrade-ai-experience-engineer-conversational-ai"&gt;https://weworkremotely.com/remote-jobs/upgrade-ai-experience-engineer-conversational-ai&lt;/a&gt;&lt;/p&gt;
+</description>
+      <pubDate>Thu, 15 Oct 2026 07:31:14 +0000</pubDate>
+      <expires_at>Sat, 14 Nov 2026 07:31:14 +0000</expires_at>
+      <guid>https://weworkremotely.com/remote-jobs/upgrade-ai-experience-engineer-conversational-ai</guid>
+      <link>https://weworkremotely.com/remote-jobs/upgrade-ai-experience-engineer-conversational-ai</link>
+    </item>
+    

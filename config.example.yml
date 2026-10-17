@@ -77,6 +77,20 @@ sources:
     queries: [python, django, backend] # API keyword searches
     max_pages_per_query: 3        # bound requests per query
     request_delay_s: 1.0          # pause between API pages
+  remoteok:
+    enabled: true                  # one public API call per daily run; retain Remote OK attribution
+  wwr:
+    enabled: true                  # backend and full-stack RSS; retain WWR application links
+    request_delay_s: 1.0          # pause between the two category feeds
+  workingnomads:
+    enabled: true                  # one public exposed-jobs API call per run
+  jobicy:
+    enabled: true                  # public feed covers only the last seven days; poll at most hourly
+    count: 50
+    tag: python
+    # geo: anywhere               # optional API eligibility filter (e.g. anywhere, apac)
+    max_pages: 1                  # bounded cursor pagination
+    request_delay_s: 1.0          # pause between pages when max_pages is increased
 
 filters:
   max_age_days_watchlist: 120   # live watched ATS boards: older posts can still be open
