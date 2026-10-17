@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
+from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 import yaml
 import requests
 
@@ -194,3 +198,145 @@ def test_teamtailor_adapter(monkeypatch):
     assert job.id == "teamtailor:example:99"
     assert "Remote" in job.location
     assert "FastAPI development." in job.description
+
+
+def test_embed_detection_and_1hop_crawl(monkeypatch):
+    """Test 1-hop link following from homepage to careers page and Greenhouse embed detection."""
+    class MockSession:
+        headers = {}
+        def get(self, url, **kwargs):
+            if url == "https://acme.io":
+                return SimpleNamespace(url="https://acme.io", text='<a href="/careers">Join our team</a>', raise_for_status=lambda: None)
+            if url == "https://acme.io/careers":
+                return SimpleNamespace(url="https://acme.io/careers", text='<div id="grnhse_app"><script src="https://boards.greenhouse.io/embed/job_board/js?for=acme"></script></div>', raise_for_status=lambda: None)
+            raise requests.HTTPError(f"Unexpected url {url}")
+
+    def mock_valid(session, ats_name, board, **kwargs):
+        return (ats_name, board) == ("greenhouse", "acme")
+
+    monkeypatch.setattr(watchlist, "_valid_board", mock_valid)
+    result = watchlist.resolve_company({"company": "Acme", "website": "https://acme.io"}, MockSession())
+    assert result == {"ats": "greenhouse", "board": "acme", "reason": "careers link"}
+
+
+def test_slug_collision_rejection():
+    """Test candidate boards with different names are rejected on slug collision."""
+    # When candidate board name is different from target company
+    assert not watchlist.company_match("Random Dental Clinic", "Acme", "https://acme.com", "https://randomdental.com")
+    # When candidate board name matches target company
+    assert watchlist.company_match("Acme Corp", "Acme", "https://acme.com", "https://acme.com")
+    assert watchlist.company_match("Canonical Group Ltd", "Canonical")
+
+
+def test_transient_failure_retry_and_dead_marking(tmp_path, monkeypatch):
+    """Test transient errors retry after cooldown and are marked dead after max attempts."""
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    (vendor / "flaky.md").write_text('---\ntitle: "FlakyCo"\nwebsite: https://flaky.com\nregion: worldwide\n---\n')
+
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    watch_file = tmp_path / "watch.yml"
+
+    # Seed an existing transient failure that occurred yesterday (attempts=1)
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    (cache / "flakyco.json").write_text(json.dumps({
+        "reason": "careers page: ConnectionError",
+        "attempts": 1,
+        "last_attempt": yesterday,
+        "status": "transient"
+    }))
+
+    # Resolver succeeds on retry
+    monkeypatch.setattr(watchlist, "resolve_company", lambda seed, hints=None: {"ats": "ashby", "board": "flaky", "reason": "verified slug"})
+
+    res = watchlist.build(vendor, watch_file, cache)
+    assert res["resolved"] == 1
+    cached_data = json.loads((cache / "flakyco.json").read_text())
+    assert cached_data.get("ats") == "ashby"
+
+    # Now test dead marking: if already 3 attempts, mark dead and do not resolve
+    (cache / "deadco.json").write_text(json.dumps({
+        "reason": "careers page: ConnectionError",
+        "attempts": 3,
+        "last_attempt": yesterday,
+        "status": "transient"
+    }))
+    (vendor / "dead.md").write_text('---\ntitle: "DeadCo"\nwebsite: https://dead.com\nregion: worldwide\n---\n')
+
+    res2 = watchlist.build(vendor, watch_file, cache)
+    cached_dead = json.loads((cache / "deadco.json").read_text())
+    assert cached_dead.get("status") == "dead"
+
+
+def test_agency_and_staffing_exclusion(tmp_path, monkeypatch):
+    """Test staffing, agencies, and talent marketplaces are excluded at build and grow time."""
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    (vendor / "andela.md").write_text('---\ntitle: "Andela"\nwebsite: https://andela.com\nregion: worldwide\n---\n')
+    (vendor / "normal.md").write_text('---\ntitle: "NormalTech"\nwebsite: https://normal.com\nregion: worldwide\n---\n')
+
+    cache = tmp_path / "cache"
+    watch_file = tmp_path / "watch.yml"
+
+    monkeypatch.setattr(watchlist, "resolve_company", lambda seed, hints=None: {"ats": "ashby", "board": seed["company"].lower(), "reason": "verified slug"})
+
+    cfg = {
+        "filters": {
+            "exclude": {
+                "company_name_keywords": [r"\bandela\b", r"\btoptal\b"],
+                "company_types": ["agency", "outsource", "marketplace"],
+            }
+        }
+    }
+    res = watchlist.build(vendor, watch_file, cache, cfg=cfg)
+    assert res["excluded_quality"] == 1
+    entries = watchlist.list_entries(watch_file)
+    assert len(entries) == 1
+    assert entries[0]["company"] == "NormalTech"
+
+    # Test grow exclusion
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE jobs(id TEXT, payload TEXT)")
+    db.execute("CREATE TABLE decisions(job_id TEXT, outcome TEXT, stage TEXT)")
+    db.execute("CREATE TABLE feedback(job_id TEXT, label TEXT)")
+    db.execute("INSERT INTO jobs VALUES ('greenhouse:toptal:1', '{\"company\": \"Toptal\", \"regions\": [\"global\"]}')")
+    db.execute("INSERT INTO jobs VALUES ('ashby:legit:2', '{\"company\": \"LegitCo\", \"regions\": [\"global\"]}')")
+    db.commit()
+
+    grow_res = watchlist.grow(db, watch_file, cfg=cfg)
+    assert grow_res["excluded_quality"] == 1
+    assert grow_res["added"] == 1
+    grown_entries = [e["company"] for e in watchlist.list_entries(watch_file)]
+    assert "LegitCo" in grown_entries
+    assert "Toptal" not in grown_entries
+
+
+def test_vendor_name_cleaning(tmp_path):
+    """Test company name trailing > and whitespace is stripped."""
+    f = tmp_path / "alphasights.md"
+    f.write_text('---\ntitle: "AlphaSights>"\nwebsite: https://alphasights.com\nregion: worldwide\n---\n')
+    parsed = watchlist._company_file(f)
+    assert parsed["company"] == "AlphaSights"
+
+
+def test_watchlist_seeds_loading(tmp_path, monkeypatch):
+    """Test loading tracked seeds file watchlist.seeds.yml."""
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    cache = tmp_path / "cache"
+    watch_file = tmp_path / "watch.yml"
+    seeds_file = tmp_path / "seeds.yml"
+    seeds_file.write_text("""
+companies:
+  - company: Automattic
+    website: https://automattic.com
+    why: 100% remote worldwide
+""")
+    monkeypatch.setattr(watchlist, "resolve_company", lambda seed, hints=None: {"ats": "greenhouse", "board": "automattic", "reason": "verified slug"})
+
+    res = watchlist.build(vendor, watch_file, cache, seeds_file=seeds_file)
+    assert res["resolved"] == 1
+    entries = watchlist.list_entries(watch_file)
+    assert entries[0]["company"] == "Automattic"
+    assert entries[0]["ats"] == "greenhouse"

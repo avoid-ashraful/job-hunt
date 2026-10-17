@@ -346,7 +346,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
                   str(report.relative_to(ROOT)), 0)
     store.commit()
     if watch_cfg.get("enabled"):
-        stats_grow = watchlist.grow(store.db, watch_path, deny_countries=tuple(denied))
+        stats_grow = watchlist.grow(store.db, watch_path, deny_countries=tuple(denied), cfg=cfg)
         log.info("watchlist grew by %s companies (%s total)", stats_grow["added"], stats_grow["total"])
     log.info("wrote %s", report)
     return report
@@ -450,11 +450,12 @@ def main() -> None:
             vendor = ROOT / cfg["candidate"].get("company_priors", "vendor/remote-jobs/src/companies")
             cache = ROOT / cfg["output"]["state_dir"] / "watchlist_resolution"
             db_path = ROOT / cfg["output"]["state_dir"] / "scanner.sqlite"
-            print(watchlist.build(vendor, path, cache, workers=ats_cfg.get("build_workers", 8),
-                                  deny_countries=denied, hq_lookup=_hq_lookup(cfg, db_path), db_path=db_path))
+            seeds = ROOT / "watchlist.seeds.yml"
+            print(watchlist.build(vendor, path, cache, workers=ats_cfg.get("build_workers", 8), seeds_file=seeds,
+                                  deny_countries=denied, hq_lookup=_hq_lookup(cfg, db_path), db_path=db_path, cfg=cfg))
         elif args.action == "grow":
             _, store = load(args.config)
-            print(watchlist.grow(store.db, path, deny_countries=denied))
+            print(watchlist.grow(store.db, path, deny_countries=denied, cfg=cfg))
         else:
             for company in watchlist.list_entries(path):
                 print(f"{company['company']}\t{company.get('ats', '-')}/{company.get('board', '-')}\t{company.get('hq_country', '')}\t{company.get('hires', '')}")

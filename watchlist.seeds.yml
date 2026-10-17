@@ -1,0 +1,49 @@
+# Tracked seed list of verified worldwide / EOR remote employers.
+# Schema: company name, website, and why note explaining their worldwide remote policy.
+
+companies:
+  - company: Automattic
+    website: https://automattic.com
+    why: 100% distributed team across 90+ countries, hires contractors and via EOR worldwide
+  - company: GitLab
+    website: https://about.gitlab.com
+    why: Pioneer all-remote company hiring worldwide directly and via EOR
+  - company: DuckDuckGo
+    website: https://duckduckgo.com
+    why: Fully distributed global team hiring anywhere in the world
+  - company: Buffer
+    website: https://buffer.com
+    why: Fully remote team working from anywhere worldwide
+  - company: PostHog
+    website: https://posthog.com
+    why: All-remote developer tool company hiring engineers anywhere in the world
+  - company: Doist
+    website: https://doist.com
+    why: Fully remote company hiring worldwide across all timezones
+  - company: Deel
+    website: https://www.deel.com
+    why: Global employment platform hiring its own engineering team worldwide
+  - company: Oyster
+    website: https://www.oysterhr.com
+    why: Global employment and EOR platform hiring globally
+  - company: Omnipresent
+    website: https://www.omnipresent.com
+    why: Global EOR platform hiring distributed engineers worldwide
+  - company: Balena
+    website: https://www.balena.io
+    why: Remote-first IoT platform hiring engineers worldwide
+  - company: Close
+    website: https://close.com
+    why: 100% remote CRM company hiring engineers globally
+  - company: Wikimedia Foundation
+    website: https://wikimediafoundation.org
+    why: Non-profit supporting Wikipedia, hires remote technology staff globally
+  - company: Ghost
+    website: https://ghost.org
+    why: Non-profit open source publishing platform with fully remote global team
+  - company: Zapier
+    website: https://zapier.com
+    why: 100% remote company with global hiring footprint
+  - company: 10up
+    website: https://10up.com
+    why: Fully remote digital consultancy with engineers across 30+ countries
