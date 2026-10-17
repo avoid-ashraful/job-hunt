@@ -20,3 +20,4 @@ Highest priority first. Each item names its owner once picked up; agents work on
 | 14 | Duplicate audit after adding 4 remote boards: same job via RemoteOK/WWR/Jobicy and the employer ATS must be reported once, with the ATS copy winning | boards re-post ATS jobs | open |
 | 15 | AI-decision audit: sample LLM eligibility verdicts and their quoted evidence from the decisions/llm_calls tables; measure wrong "eligible"/"locked" calls and fix prompts or rules | AI is the least predictable step | Codex |
 | 16 | Daily run budget: measure end-to-end time with all sources; keep it under ~15 min (parallel fetch per source, cap detail fetches) | more sources = slower run | open |
+| 17 | HQ for freehire jobs: company record HQ and website lookup | Unknown HQ hides company pay market; [API findings and read-only measurement](FREEHIRE_HQ.md) | done (branch) |

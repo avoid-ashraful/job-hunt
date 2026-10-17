@@ -50,6 +50,7 @@ def to_job(raw: dict) -> Job:
         regions=raw.get("regions") or [],
         countries=raw.get("countries") or [],
         cities=raw.get("cities") or [],
+        ats_metadata={"freehire_company_slug": raw["company_slug"]} if raw.get("company_slug") else {},
         skills=raw.get("skills") or [],
         posted_at=_dt(raw.get("posted_at")),
         first_seen_at=_dt(raw.get("created_at")),

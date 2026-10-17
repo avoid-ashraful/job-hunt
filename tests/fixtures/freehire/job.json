@@ -1,0 +1,10 @@
+{
+  "source": "startupjobs",
+  "external_id": "123",
+  "url": "https://startup.jobs/example-123",
+  "title": "Python Engineer",
+  "company": "Example, Inc.",
+  "company_slug": "example-inc",
+  "location": "Bangalore, India",
+  "countries": ["in"]
+}

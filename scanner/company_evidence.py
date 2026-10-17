@@ -166,7 +166,7 @@ def _company_metadata(data: dict) -> tuple[str | None, str, str]:
 
 
 def lookup(job: Job) -> tuple[str | None, str]:
-    from scanner.board_owner import ATS_DOMAINS, LANDING, _tokens
+    from scanner.board_owner import ATS_DOMAINS, LANDING, _tokens, names_match
     from scanner.liveness import _ats_identity
 
     with requests.Session() as session:
@@ -214,6 +214,30 @@ def lookup(job: Job) -> tuple[str | None, str]:
             return (urlparse(url).scheme in {"http", "https"} and
                     not any(host == d or host.endswith("." + d) for d in ATS_DOMAINS) and
                     len(wanted) >= 4 and wanted in re.sub(r"[^a-z0-9]", "", host))
+
+        if job.source == "freehire":
+            slug = metadata.get("freehire_company_slug") or job.company_key
+            endpoint = f"https://freehire.me/api/v1/companies/{quote(slug, safe='')}?limit=1"
+            if (response := _fetch(session, endpoint)) is not None:
+                try:
+                    data = response.json()
+                except ValueError:
+                    data = {}
+                data = data.get("data") if isinstance(data, dict) else None
+                company = data.get("company") if isinstance(data, dict) else None
+                if (isinstance(company, dict) and isinstance(company.get("name"), str) and
+                        names_match(company["name"], job.company)):
+                    if code := country_code(company.get("hq_country")):
+                        return code, f"freehire company hq_country: {endpoint}"
+                    info = company.get("company_info")
+                    site = info.get("website") if isinstance(info, dict) else None
+                    if isinstance(site, str) and site.strip():
+                        site = site.strip()
+                        if "://" not in site:
+                            site = "https://" + site
+                        # Aggregated company records can contain another employer's website.
+                        if employer_url(site):
+                            website = website or site
 
         if not website and employer_url(job.url):
             parsed = urlparse(job.url)
