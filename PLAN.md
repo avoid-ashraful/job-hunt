@@ -13,7 +13,7 @@ Out of scope for now: auto-filling or auto-submitting (later phase, laptop side)
 | Tool | Role in this setup | Why |
 |---|---|---|
 | **freehire** public API (`freehire.me/api/v1`, MIT, ~800★, active) | **Primary source** | 3.3M open postings from 225 sources (Workday, Greenhouse, Lever, Ashby, iCIMS, remote boards…). Keyless. Already has filters for remote, region, seniority, category, skills, age, plus a freshness signal that flags reposted and evergreen postings. |
-| **career-ops** scanner (MIT, ~75k★, released weekly) | **Secondary source + liveness** | Reads ATS APIs directly for a watchlist of companies you name, plus remote boards (RemoteOK, Remotive, WWR, Himalayas, Working Nomads, Jobicy). Zero tokens. `liveness-api.mjs` and `check-liveness.mjs` confirm a posting is still open. Gives redundancy if freehire is down or misses a company. |
+| **Native ATS watchlist + remote boards** (built; replaced the planned career-ops integration) | **First-priority sources + liveness** | Reads 19 public ATS APIs directly for a self-growing watchlist of worldwide-hiring companies, plus Hacker News, Himalayas, Workable search, Remote OK, We Work Remotely, Working Nomads and Jobicy. Zero tokens. Our own liveness check confirms a posting is still open. See `docs/SOURCES.md`. |
 | **remoteintech/remote-jobs** (~41k★) | Company prior | Curated list of remote-friendly companies with their hiring regions. Used as a hint for "does this company hire globally". |
 | **LLM** (Gemini Flash via API key, or Claude via `claude -p` on the VPS) | Judgement step | Reads the full description only for jobs that passed the cheap filters. Decides who can actually apply ("remote anywhere"), checks stack and seniority fit, and quotes the sentence it based that on. |
 | JobSync (MIT, ~1.4k★) | Not used for scanning | Nice tracker UI, but its discovery only covers Greenhouse, Lever and Ashby company directories, with no way to judge "remote anywhere". Could be added later as a tracker/UI. |
@@ -34,8 +34,8 @@ fetch ─► normalize ─► hard filters ─► dedup & collapse ─► LLM el
 ```
 
 1. **Fetch.** Query freehire with broad filters: remote, your categories, your
-   seniorities, `open_within_days=21`, every region. Run the career-ops scanner
-   on your watchlist and the remote boards. Save everything raw.
+   seniorities, `open_within_days=21`, every region. Read the ATS
+   watchlist and the remote boards. Save everything raw.
 2. **Normalize** into one SQLite table: company, title, url, source, posted_at,
    first_seen, location text, region tags, salary, description. This is also
    where the state lives: seen, applied, dismissed, not-eligible. A job you
@@ -134,19 +134,18 @@ delivery: [file]          # + telegram | email
 
 ## 5. Build phases
 
-Status (2026-10-15): phases 1, 2 and 4 are built (cron + daily markdown file). Phase 3 (career-ops second source) is next. Liveness currently relies on freehire's last-seen date.
+Status (2026-10-17): phases 0-4 are built and running daily from cron, with a weekly learning report, a weekly watchlist rebuild and a `selftest` regression gate. Phase 3 changed shape: instead of career-ops, the scanner reads the ATS watchlist and the remote boards natively, and checks liveness itself. What shipped is described in `README.md`; open and finished improvements are tracked in `docs/BACKLOG.md`. Only phase 5 and Telegram/email delivery remain unbuilt.
 
 | Phase | Deliverable | How you'll know it works |
 |---|---|---|
-| 0 | Fill in `config.yml`; choose the LLM | — |
-| 1 | freehire fetch → SQLite → hard filters → seniority collapse → markdown report (no LLM) | Run it manually and review recall: are jobs you'd want missing? |
-| 2 | LLM eligibility and fit with quoted evidence; ✅ / 🟡 / 📁 buckets | Spot-check 20 verdicts against the descriptions |
-| 3 | career-ops scanner as second source (watchlist + remote boards); liveness re-check | Both sources show up, deduplicated; no closed links in the report |
-| 4 | cron schedule, Telegram/email delivery, `applied` / `dismiss` / `not-eligible` commands | A report arrives daily; handled jobs don't reappear |
+| 0 | Fill in `config.yml`; choose the LLM | Done: `private/config/config.yml`, free model → Gemini → Claude CLI chain |
+| 1 | freehire fetch → SQLite → hard filters → seniority collapse → markdown report (no LLM) | Built. Recall audits in `docs/audits/` |
+| 2 | LLM eligibility and fit with quoted evidence; ✅ / 🟡 / 📁 buckets | Built, then reversed to rules first: a rule engine decides most jobs and the LLM only handles ambiguous wording. Tiers are Apply / Check / Long shots; drops are logged to `private/state/dropped/` |
+| 3 | Second source: native ATS watchlist (19 adapters, `watchlist build/grow/seeds`, weekly rebuild) + remote boards (HN, Himalayas, Workable, Remote OK, WWR, Working Nomads, Jobicy); liveness re-check | Built. Cross-source dedup keeps the employer copy; liveness drops clear 404/410 |
+| 4 | cron schedule, feedback and application tracking (`feedback`, `applied`, `app`, `status`, marks in the report) | Built: daily cron plus weekly learn, watchlist and vendor jobs. Delivery is the markdown file only; Telegram/email not built |
 | 5 (later) | Hand the ✅ list to the laptop autofill flow (Simplify + Claude in Chrome) | — |
 
-Stack: Python 3.12 + SQLite in `~/job_hunt/scanner/`. career-ops is called as a
-subprocess, and its output is read from its data files.
+Stack: Python + SQLite in `~/job_hunt/scanner/`, managed with uv. Private data (config, profile, reports, state) lives in the gitignored `private/` folder.
 
 ---
 
