@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
+from scanner.dedup import normalize_url
 from scanner.models import Job
 from scanner.store import job_ref
 
@@ -34,6 +35,15 @@ def _decided_by(sc: dict) -> str:
     return f"AI ({rule.split(':')[-1]})" if rule.startswith("llm:") else rule
 
 
+def _apply_link(job: Job) -> str:
+    name = {"himalayas": "Himalayas", "remoteok": "Remote OK",
+            "wwr": "We Work Remotely", "jobicy": "Jobicy"}.get(job.source)
+    source_url = job.ats_metadata.get("source_url")
+    if name and source_url and normalize_url(source_url) != job.url:
+        return f"[apply]({job.url}) · [{name}]({source_url})"
+    return f"[{name + ' apply' if name else 'apply'}]({job.url})"
+
+
 def _table(jobs: list[Job], with_why: bool) -> list[str]:
     head = "| Ref | Mark | Fit | Company | HQ | Title | Who can apply | Evidence | Decided by |" + (" Why here |" if with_why else "")
     lines = [head + " Pay | First seen | Apply |", "|" + "---|" * (head.count("|") + 2)]
@@ -54,7 +64,7 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
         lines.append(
             f"| `{job_ref(job.id)}` | [ ] | {sc.get('fit', '')}/5 | {_cell(job.company)} | {hq} | {'★ watchlist ' if job.watchlist else ''}{_cell(job.title)} | {_cell(who)} | "
             f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_cell(pay)} | {seen} | "
-            f"[{('Himalayas apply' if job.source == 'himalayas' else 'apply')}]({job.url}) |"
+            f"{_apply_link(job)} |"
         )
     return lines
 

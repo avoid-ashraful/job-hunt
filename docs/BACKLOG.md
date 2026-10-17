@@ -10,4 +10,4 @@ Highest priority first. Each item names its owner once picked up; agents work on
 | 4 | Recall audit: sample jobs dropped by "no Python" / "title not in target role families" / "region locked" and measure false negatives against the user's profile | 863 + 437 drops a day; one bad rule hides good jobs | done 2026-10-17: AI/LLM/agentic engineer, founding engineer, member of technical staff, product engineer added to role families; next: >21-day worldwide Python jobs on live ATS boards |
 | 5 | Run time and failure visibility: per-source timing + counts in the daily log and report footer; alert line when a source returns 0 | silent source failures look like "no jobs" | open |
 | 6 | GitHub Actions CI: `uv run pytest` on push | agent branches get merged by hand | open |
-| 7 | career-ops as a second source (PLAN stage 3) | redundancy + more remote boards | open |
+| 7 | Native remote job boards (replaces career-ops as a second source) | redundancy + more remote boards | done (branch): RemoteOK, We Work Remotely, Working Nomads, Jobicy; Remotive skipped (robots) |
