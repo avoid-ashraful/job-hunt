@@ -86,13 +86,13 @@ def _feedback(url: str, response: requests.Response) -> None:
 
 
 def _request(session: requests.Session, url: str, *, params: dict | None = None,
-             retries: int = 3, timeout: int = 12) -> requests.Response:
+             retries: int = 3, timeout: int = 12, method: str = "get", **kwargs) -> requests.Response:
     for attempt in range(retries):
         _pace(url)
         blocked = _BLOCKED.get(_host(url))
         if blocked and blocked[0] > time.monotonic():
             return blocked[1]
-        response = session.get(url, params=params, timeout=timeout)
+        response = getattr(session, method)(url, params=params, timeout=timeout, **kwargs)
         _feedback(url, response)
         if attempt + 1 < retries:
             if response.status_code == 429:
@@ -445,10 +445,7 @@ def _record(raw: dict, company: dict, cfg: dict, session: requests.Session) -> J
         raw = {**detail, **raw}
     elif ats == "workable" and not desc:
         if raw.get("_markdown_detail"):
-            _pace(raw["_markdown_detail"])
-            response = session.get(raw["_markdown_detail"], timeout=10)
-            response.raise_for_status()
-            desc = response.text
+            desc = get_text(session, raw["_markdown_detail"], timeout=10)
         else:
             detail = get(session, f"https://apply.workable.com/api/v1/accounts/{quote(board)}/jobs/{jid}")
             desc = detail.get("description") or ""

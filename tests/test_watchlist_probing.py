@@ -11,7 +11,7 @@ import requests
 import yaml
 
 from scanner import board_owner, watchlist
-from scanner.sources import ats
+from scanner.sources import ats, _more_ats
 
 
 @pytest.fixture(autouse=True)
@@ -49,6 +49,34 @@ class Session:
 
     def close(self):
         pass
+
+
+def test_workday_post_honors_a_block_set_by_a_detail_request(clock):
+    url, _ = ats._base("workday", "acme|wd5|External")
+    ats._feedback(url, response(429, headers={"Retry-After": "3600"}))
+    calls = []
+
+    class WorkdaySession:
+        def post(self, target, **kwargs):
+            calls.append(target)
+            return response(data={"jobPostings": [], "total": 0})
+
+    with pytest.raises(requests.HTTPError) as err:
+        _more_ats.rows(WorkdaySession(), "workday", "acme|wd5|External")
+    assert err.value.response.status_code == 429
+    assert calls == []
+
+
+def test_workable_markdown_detail_honors_a_quota_block(clock):
+    url = "https://apply.workable.com/acme/jobs/view/ABC.md"
+    ats._feedback(url, response(429, headers={"Retry-After": "3600"}))
+    session = Session({url: [response(text="Build Python services")]})
+    raw = {"shortcode": "ABC", "title": "Python Engineer", "location": "Remote",
+           "url": url.removesuffix(".md"), "_markdown_detail": url}
+    with pytest.raises(requests.HTTPError) as err:
+        ats._record(raw, {"company": "Acme", "ats": "workable", "board": "acme"}, {}, session)
+    assert err.value.response.status_code == 429
+    assert session.calls == []
 
 
 @pytest.mark.parametrize("getter", [ats.get, ats.get_text])

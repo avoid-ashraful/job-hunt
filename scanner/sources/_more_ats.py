@@ -103,7 +103,7 @@ def _html_rows(text: str, ats: str, board: str) -> list[dict]:
 
 
 def rows(session, ats: str, board: str, limit: int = 200) -> list[dict]:
-    from scanner.sources.ats import _pace, get, get_text
+    from scanner.sources.ats import _request, get, get_text
 
     url, params = base(ats, board)
     limit = min(200, max(1, limit))
@@ -112,9 +112,9 @@ def rows(session, ats: str, board: str, limit: int = 200) -> list[dict]:
     if ats == "workday":
         out = []
         for offset in range(0, limit, 20):
-            _pace(url)
-            response = session.post(url, json={"limit": min(20, limit - offset), "offset": offset,
-                                              "searchText": "", "appliedFacets": {}}, timeout=12)
+            response = _request(session, url, method="post",
+                                json={"limit": min(20, limit - offset), "offset": offset,
+                                      "searchText": "", "appliedFacets": {}})
             response.raise_for_status()
             data = response.json()
             page = data.get("jobPostings") or []
