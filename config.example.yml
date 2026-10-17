@@ -122,10 +122,10 @@ filters:
   # A title must match at least one family. Order matters: first match wins and is
   # the "role family" used when collapsing seniority within a company.
   role_families:
-    python:     ['\bpython\b', '\bdjango\b', '\bfastapi\b']
+    python:     ['\bpython3?\b', '\bdjango\b', '\bfastapi\b']
     backend:    ['back[\s-]?end', '\bapi\b', 'platform engineer', 'server[\s-]?side']
     fullstack:  ['full[\s-]?stack']
-    applied_ai: ['applied ai', '\b(ai|llm|gen(erative)?\s?ai|agentic( ai)?)\s+(software\s+)?(engineer|developer)\b', '\bai (platform|application|product|systems?) engineer\b']
+    applied_ai: ['applied ai', '\b(ai|llm|gen(erative)?\s?ai|agentic( ai)?)\s+(software\s+)?(engineer|developer)\b', '\bai (platform|application|product|systems?|infrastructure) engineer\b', 'applied (ai|ml)\b', '\bai\s*/\s*ml\s+(software\s+)?(engineer|developer)\b', '\b(ml|ai|llm)\s+(platform|infrastructure|inference)\s+engineer\b']
     software:   ['software (engineer|developer|development engineer)', '\bswe\b', '\bsde\b']
     generic:    ['^\W*((sr\.?|senior|staff|lead|principal)\s+)*(engineer|developer)\b']
     startup:    ['\bfounding (software |backend |full[\s-]?stack )?engineer\b', '\bmember of technical staff\b', '\bproduct engineer\b']
@@ -145,7 +145,7 @@ filters:
 
   stack:
     # keep if Python evidence; else drop if another backend language is named; else keep
-    python_patterns: ['\bpython\b', '\bdjango\b', '\bfastapi\b', '\bflask\b']
+    python_patterns: ['\bpython3?\b', '\bdjango\b', '\bfastapi\b', '\bflask\b']
     other_language_patterns:
       - '\bjava\b(?!script)'
       - '\bgolang\b'

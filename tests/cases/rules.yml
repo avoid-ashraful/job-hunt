@@ -415,3 +415,29 @@
     description: The salary range for candidates located in the United States is $150,000 - $190,000.
   expected:
     outcome: ambiguous
+- name: python3-counts-as-python
+  stage: filter
+  job:
+    title: Senior Backend Engineer
+    description: We build services in Python3 and PostgreSQL. Java experience is a plus.
+  expected:
+    outcome: keep
+- name: applied-ml-engineer-is-target
+  stage: filter
+  job:
+    title: Senior Applied ML Engineer
+  expected:
+    outcome: keep
+    family: applied_ai
+- name: ml-platform-engineer-is-target
+  stage: filter
+  job:
+    title: Staff ML Platform Engineer
+  expected:
+    outcome: keep
+- name: plain-machine-learning-engineer-stays-out
+  stage: filter
+  job:
+    title: Machine Learning Engineer
+  expected:
+    outcome: drop
