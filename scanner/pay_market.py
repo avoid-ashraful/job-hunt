@@ -10,18 +10,28 @@ from scanner.models import Job
 
 DEFAULT_ALLOW = ["us", "ca", "gb", "de", "fr", "nl", "ie", "es", "pt", "it", "pl", "se", "no", "dk", "fi", "at", "be", "lu", "cz", "ee", "lv", "lt", "si", "sk", "hr", "gr", "mt", "cy", "ro", "bg", "hu", "is", "li", "ch", "sg", "my", "au", "nz", "jp", "il", "ae"]
 LOCAL = {"in", "bd"}
-LOCAL_PLACE = re.compile(r"^(?:(?:remote|work from home)\s*[-–,:()]?\s*)?(?:(?:india|bangladesh|bengaluru|bangalore|pune|hyderabad|noida|gurugram|gurgaon|chennai|mumbai|kolkata|ahmedabad|delhi|dhaka|chattogram|chittagong)\s*[,/&+\-– ]*\s*)+$", re.I)
+_PLACES = {
+    "in": "india|bengaluru|bangalore|pune|hyderabad|noida|gurugram|gurgaon|chennai|mumbai|kolkata|ahmedabad|delhi",
+    "bd": "bangladesh|dhaka|chattogram|chittagong",
+}
+_PREFIX = r"^(?:(?:remote|work from home)\s*[-–,:()]?\s*)?"
+LOCAL_PLACE = {code: re.compile(_PREFIX + rf"(?:(?:{names})\s*[,/&+\-– ]*\s*)+$", re.I) for code, names in _PLACES.items()}
+ANY_LOCAL = re.compile(_PREFIX + rf"(?:(?:{'|'.join(_PLACES.values())})\s*[,/&+\-– ]*\s*)+$", re.I)
 
 
-def local_only(job: Job) -> bool:
-    """Source countries are hiring locations; a mixed list is not local-only."""
+def local_only(job: Job) -> set[str]:
+    """The local countries (in/bd) a posting is limited to; empty when it isn't local-only.
+
+    Source countries are hiring locations, so a mixed list ("in, us, gb") is not local-only."""
+    if "global" in job.regions:
+        return set()
     countries = {str(x).lower() for x in job.countries}
     if countries:
-        return countries <= LOCAL and "global" not in job.regions
-    if job.cities:
-        return all(LOCAL_PLACE.fullmatch(str(city).strip()) for city in job.cities) and "global" not in job.regions
-    location = job.location.strip()
-    return bool(LOCAL_PLACE.fullmatch(location))
+        return countries if countries <= LOCAL else set()
+    places = [str(c).strip() for c in job.cities] or [job.location.strip()]
+    if not all(ANY_LOCAL.fullmatch(p) for p in places if p) or not any(places):
+        return set()
+    return {code for code, rx in LOCAL_PLACE.items() if any(rx.search(p) for p in places)}
 
 
 def salary_usd(job: Job, cfg: dict) -> str:

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from scanner.dedup import seniority_level
 from scanner.models import Job
-from scanner.pay_market import local_only
+from scanner.pay_market import DEFAULT_ALLOW, local_only
 
 
 def _rx(patterns: list[str]) -> list[re.Pattern]:
@@ -79,8 +79,12 @@ class Filters:
         country, _ = self.profiles.resolve(job) if self.profiles else (None, "")
         if country in set(self.market.get("deny_hq_countries", ["in", "bd"])):
             return f"company based in {country.upper()}"
-        if self.market.get("drop_local_only_locations", True) and local_only(job):
-            return "location only in India/Bangladesh"
+        if self.market.get("drop_local_only_locations", True) and (local := local_only(job)):
+            # A foreign company hiring in Bangladesh is the best case; a local one isn't.
+            allow = set(self.market.get("allow_hq_countries", DEFAULT_ALLOW))
+            if local == {"bd"} and country in allow:
+                return None
+            return f"location only in {'/'.join(sorted(c.upper() for c in local))}"
         return None
 
     def _company(self, job: Job) -> str | None:

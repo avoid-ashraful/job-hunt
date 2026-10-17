@@ -33,7 +33,7 @@ filters:
     allow_hq_countries: [us, ca, gb, de, fr, nl, ie, es, pt, it, pl, se, no, dk, fi, at, be, lu, cz, ee, lv, lt, si, sk, hr, gr, mt, cy, ro, bg, hu, is, li, ch, sg, my, au, nz, jp, il, ae]
     # ISO2 headquarters to exclude; unknown headquarters stay eligible.
     deny_hq_countries: [in, bd]
-    # Exclude postings whose only source hiring countries are India/Bangladesh.
+    # Exclude postings limited to India, and to Bangladesh unless the HQ is allow-listed (a foreign company hiring in BD).
     drop_local_only_locations: true
     # Verified ISO2 HQ overrides by normalized company key; leave empty unless checked.
     hq_overrides: {}

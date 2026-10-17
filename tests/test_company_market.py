@@ -91,11 +91,16 @@ def test_filter_distinguishes_hq_and_job_location():
     f = Filters(cfg["filters"], cfg["dedup"]["seniority_rank"], datetime.now(timezone.utc),
                 CompanyProfiles(db, cfg["filters"]["company_market"]))
     assert f.evaluate(job(company="Atlas", description="Atlas is headquartered in New York, USA.",
-                          location="Bangalore", countries=["in"])) == "location only in India/Bangladesh"
+                          location="Bangalore", countries=["in"])) == "location only in IN"
     mixed = job(company="Acme", description="Acme is headquartered in Berlin, Germany. We also hire in India.",
                 countries=["de", "in"])
     assert f.evaluate(mixed) is None
     assert mixed.screen["hq_country"] == "de"
+    # a foreign company hiring in Bangladesh is what the candidate wants; a Bangladesh-only job with
+    # no known foreign HQ is most likely a local company
+    foreign = job(company="Orbit", description="Orbit is headquartered in Austin, USA.", location="Dhaka", countries=["bd"])
+    assert f.evaluate(foreign) is None
+    assert f.evaluate(job(company="Nameless", location="Dhaka", countries=["bd"])) == "location only in BD"
 
 
 def test_pay_hint_and_sort(tmp_path: Path):
