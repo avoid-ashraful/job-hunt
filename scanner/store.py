@@ -9,7 +9,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from scanner.dedup import description_fingerprint, fingerprint
+from scanner.dedup import description_fingerprint, description_variant_fingerprint, fingerprint
 from scanner.models import Job
 
 def job_ref(job_id: str) -> str:
@@ -129,6 +129,16 @@ class Store:
             (job.id, job.url, fingerprint(job.company_key, job.title), description_fingerprint(job)),
         ).fetchone()
         if not row:
+            descriptions = {description_fingerprint(job), description_variant_fingerprint(job)} - {None}
+            if descriptions:
+                for payload, reported_on in self.db.execute(
+                    "SELECT j.payload, r.reported_on FROM reported r JOIN jobs j ON j.id = r.id"
+                    " WHERE r.company_key = ?", (job.company_key,),
+                ):
+                    other = Job(**json.loads(payload))
+                    variants = {description_fingerprint(other), description_variant_fingerprint(other)} - {None}
+                    if descriptions & variants:
+                        return f"already reported on {reported_on} (same company+title variant+text)"
             return None
         how = ("same id" if row[0] == job.id else "same link" if row[1] == job.url
                else "same company+title" if row[2] == fingerprint(job.company_key, job.title) else "same title+text")
