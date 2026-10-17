@@ -72,8 +72,8 @@ def ats_id(url: str, company: str) -> str | None:
         return f"lever:{path[0]}:{path[1]}"
     if host == "jobs.ashbyhq.com" and len(path) >= 2:
         return f"ashby:{path[0]}:{path[1]}"
-    if host == "apply.workable.com" and len(path) >= 2 and path[-2] == "j":
-        return f"workable:{normalize_company(company)}:{path[-1]}"
+    if host == "apply.workable.com" and len(path) >= 3 and path[-2] == "j":
+        return f"workable:{path[-3]}:{path[-1]}"
     if host == "jobs.smartrecruiters.com" and len(path) >= 2:
         return f"smartrecruiters:{path[0]}:{path[1]}"
     match = re.fullmatch(r"([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com", host)

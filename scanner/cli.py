@@ -93,6 +93,8 @@ def _fill_missing(first: Job, other: Job) -> None:
         if getattr(first, name) in (None, "", [], {}) and getattr(other, name) not in (None, "", [], {}):
             setattr(first, name, getattr(other, name))
     first.watchlist = first.watchlist or other.watchlist
+    if other.last_seen_at and (first.last_seen_at is None or other.last_seen_at > first.last_seen_at):
+        first.last_seen_at = other.last_seen_at
 
 
 def load_env(path: Path) -> None:

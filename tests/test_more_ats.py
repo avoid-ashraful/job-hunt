@@ -34,7 +34,8 @@ def board(request, monkeypatch):
         def post(self, target, **kwargs):
             calls.append(("POST", target, kwargs))
             assert target == url
-            return SimpleNamespace(json=lambda: fixture["response"], raise_for_status=lambda: None)
+            return SimpleNamespace(json=lambda: fixture["response"], raise_for_status=lambda: None,
+                                   status_code=200, headers={})
 
         def close(self):
             pass
@@ -110,7 +111,8 @@ def test_workday_pagination_is_capped(monkeypatch):
             offsets.append(json["offset"])
             page = [{"title": "Engineer", "externalPath": f"/job/Remote/R{i}"}
                     for i in range(json["offset"], json["offset"] + json["limit"])]
-            return SimpleNamespace(json=lambda: {"total": 2000, "jobPostings": page}, raise_for_status=lambda: None)
+            return SimpleNamespace(json=lambda: {"total": 2000, "jobPostings": page}, raise_for_status=lambda: None,
+                                   status_code=200, headers={})
 
     assert len(_more_ats.rows(Session(), "workday", "example|wd5|External", 999)) == 200
     assert offsets == list(range(0, 200, 20))

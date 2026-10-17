@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
@@ -9,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scanner.models import Job
+
+log = logging.getLogger(__name__)
 
 COUNTRIES = {
     "india": "in", "bangladesh": "bd", "united states": "us", "usa": "us", "u.s.": "us",
@@ -105,8 +108,16 @@ class CompanyProfiles:
                 unknown.setdefault(job.company_key, job)
         pending = [job for job in unknown.values() if not self.resolve(job)[0]][:max(0, 100 - len(self.attempted))]
         self.attempted.update(job.company_key for job in pending)
+
+        def lookup_safely(job):
+            try:
+                return lookup(job)
+            except Exception as exc:
+                log.warning("HQ lookup for %s failed: %s: %s", job.company_key, type(exc).__name__, exc)
+                return None, "company lookup failed"
+
         with ThreadPoolExecutor(max_workers=5) as pool:
-            results = list(pool.map(lookup, pending))
+            results = list(pool.map(lookup_safely, pending))
         for job, (country, evidence) in zip(pending, results):
             if country:
                 self.db.execute("""UPDATE company_profiles SET hq_country=?, evidence=?, source=?,

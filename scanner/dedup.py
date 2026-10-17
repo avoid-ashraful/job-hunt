@@ -92,7 +92,7 @@ def merge_jobs(jobs: Iterable[Job], fill_missing: Callable[[Job, Job], None]) ->
     identities: dict[tuple[str, str], str] = {}
     positions: dict[str, int] = {}
     for job in ordered:
-        company = normalize_company(job.company)
+        company = normalize_company(job.company) or job.company_key or job.company.casefold()
         keys = {("id", job.id), ("url", normalize_url(job.url)),
                 ("title", fingerprint(company, job.title))}
         if desc := description_fingerprint(job):
@@ -101,6 +101,12 @@ def merge_jobs(jobs: Iterable[Job], fill_missing: Callable[[Job, Job], None]) ->
         if variant := description_variant_fingerprint(job):
             keys.add(("variant", f"{company}|{variant}"))
         matches = {identities[k] for k in keys if k in identities}
+        exact = {identities[k] for k in keys if k[0] in {"id", "url"} and k in identities}
+        # Employer requisitions can share a title but have different hiring locations.
+        if job.source == "ats":
+            matches = exact
+        elif exact:
+            matches = exact | {jid for jid in matches if merged[jid].source != "ats"}
         if matches:
             winner = min(matches, key=positions.__getitem__)
             for jid in sorted(matches, key=positions.__getitem__):

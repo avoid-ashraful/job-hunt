@@ -16,6 +16,8 @@ _PAY = re.compile(rf"(?<![\w.,])(?P<upper>up\s+to\s+)?{_AMOUNT}{_RANGE}(?:\s*(?P
 _CUE = re.compile(r"\b(salary|compensation|pay|base|range|OTE)\b", re.I)
 _NON_PAY = re.compile(r"\b(raised|funding|funded|revenue|valuation|budget|bonus|equity|stock|sign.on|relocation)\b", re.I)
 _NOT_AMOUNT = re.compile(r"\s*(?:%|employees?\b|people\b|years?\b|users?\b|customers?\b|(?:signing\s+)?bonus\b|(?:in\s+)?(?:equity|stock)\b)", re.I)
+_LOWER_BOUND = re.compile(r"\b(?:from|start(?:s|ing)?(?:\s+(?:at|from))?|minimum(?:\s+(?:base\s+)?(?:salary|pay))?|at least)\s*:?\s*$", re.I)
+_LOWER_SUFFIX = re.compile(r"\s*(?:\+|(?:or|and)\s+(?:more|above|higher|up)\b)", re.I)
 _CODES = {"$": "USD", "US$": "USD", "€": "EUR", "£": "GBP", "CA$": "CAD", "C$": "CAD",
           "AU$": "AUD", "A$": "AUD", "S$": "SGD"}
 _PERIODS = {"annum": "year", "yr": "year", "annually": "year", "yearly": "year", "mo": "month",
@@ -38,6 +40,9 @@ def _extract(text: str) -> tuple[tuple[float | None, float, str | None, str], st
         before = re.split(r"(?<=[.!?;])\s+|\n", text[max(0, match.start() - 60):match.start()])[-1]
         after = text[match.end():match.end() + 30]
         if _NOT_AMOUNT.match(after) or _NON_PAY.search(before):
+            continue
+        # The hard filter needs a ceiling; an explicit minimum must not become one.
+        if not g["number2"] and (_LOWER_BOUND.search(before) or _LOWER_SUFFIX.match(after)):
             continue
         currencies = [c.upper() for c in (g["currency1"], g["currency2"], g["currency3"]) if c]
         codes = {_CODES.get(c, c) for c in currencies if c != "$"}

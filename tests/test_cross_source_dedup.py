@@ -100,3 +100,24 @@ def test_same_text_under_tenant_and_brand_names_still_merges():
                     company_key="parent-brand", url="https://jobicy.com/42", salary_min=120000)
     assert list(merge_jobs([board, live], _fill_missing).values()) == [live]
     assert live.salary_min == 120000
+
+
+def test_non_ascii_employers_keep_distinct_source_company_keys():
+    first = employer(id="freehire::1", source="freehire", company="百度", company_key="baidu",
+                     url="https://example.com/1", description="Build Python search services.")
+    second = employer(id="freehire::2", source="freehire", company="腾讯", company_key="tencent",
+                      url="https://example.com/2", description="Build Python messaging services.")
+    assert list(merge_jobs([first, second], _fill_missing).values()) == [first, second]
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("with_copy", [False, True])
+def test_distinct_employer_requisitions_survive_until_location_filtering(reverse, with_copy):
+    us = employer(id="ashby:acme:us", url="https://jobs.ashbyhq.com/acme/us",
+                  location="Remote, US", description="Candidates must reside in the United States.")
+    worldwide = employer(id="ashby:acme:world", url="https://jobs.ashbyhq.com/acme/world",
+                         location="Remote, Worldwide", description="We hire worldwide.")
+    jobs = [worldwide, us] if reverse else [us, worldwide]
+    # Equal titles are not proof that distinct employer requisitions have the same eligibility.
+    copies = [replace(us, source="freehire")] if with_copy else []
+    assert list(merge_jobs(jobs + copies, _fill_missing).values()) == jobs

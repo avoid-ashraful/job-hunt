@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 from pathlib import Path
 import sqlite3
 
@@ -7,6 +8,7 @@ import yaml
 
 from scanner import cli, liveness
 from scanner.filters import Filters
+from scanner.dedup import merge_jobs
 from scanner.models import Job
 
 
@@ -29,6 +31,30 @@ def test_ats_url_and_id_use_the_same_live_check(monkeypatch, ats, url):
     assert liveness.can_verify(job)
     assert liveness.check(job) == liveness.OPEN
     assert calls[0] == calls[1]
+
+
+def test_workable_url_uses_actual_board_slug_for_liveness(monkeypatch):
+    job = Job(id="freehire:123", source="freehire",
+              url="https://apply.workable.com/acme-labs-2/j/ABC123/", title="Python Engineer",
+              company="Acme Labs", company_key="acme-labs", description="Python")
+    actual = "https://apply.workable.com/api/v2/accounts/acme-labs-2/jobs/ABC123"
+    monkeypatch.setattr(liveness, "_status", lambda url: liveness.OPEN if url == actual else liveness.CLOSED)
+    assert liveness.can_verify(job)
+    assert liveness.check(job) == liveness.OPEN
+
+
+def test_fresh_cross_source_copy_prevents_a_stale_source_age_drop():
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
+    now = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    stale = Job(id="freehire:123", source="freehire", url="https://jobs.lever.co/acme/123",
+                title="Python Engineer", company="Acme", company_key="acme", description="Python",
+                first_seen_at=now - timedelta(days=2), last_seen_at=now - timedelta(days=11))
+    fresh = replace(stale, id="lever:acme:123", source="hn", last_seen_at=now)
+    merged = list(merge_jobs([stale, fresh], cli._fill_missing).values())
+    assert len(merged) == 1
+    filters = Filters(cfg["filters"], cfg["dedup"]["seniority_rank"], now)
+    assert filters._age(merged[0]) is None
+    assert merged[0].last_seen_at == now
 
 
 @pytest.mark.parametrize("age,status,ats,watched,enabled,ghost,expected", [

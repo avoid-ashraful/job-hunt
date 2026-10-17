@@ -255,3 +255,29 @@ def test_workday_hq_lookup_uses_board_landing(monkeypatch):
     assert company_evidence.lookup(job(id="workday:example|wd1|Careers:123",
                                       url="https://example.wd1.myworkdayjobs.com/Careers/job/123"))[0] == "de"
     assert calls[0] == "https://example.wd1.myworkdayjobs.com/Careers"
+
+
+def test_comeet_hq_lookup_uses_composite_board_landing(monkeypatch):
+    calls = network(monkeypatch, {
+        "https://www.comeet.com/jobs/example/12.003": '<a href="https://example.com/">Company</a>',
+        "https://example.com/": '<address>Berlin, Germany</address>',
+    })
+    posting = job(id="comeet:example|12.003:AB.CDE",
+                  url="https://www.comeet.com/jobs/example/12.003/backend/AB.CDE")
+    assert company_evidence.lookup(posting)[0] == "de"
+    assert calls[0] == "https://www.comeet.com/jobs/example/12.003"
+
+
+def test_malformed_company_page_cannot_abort_other_report_enrichment(monkeypatch, caplog):
+    network(monkeypatch, {
+        "https://example.com/": '<script type>untyped script</script>',
+        "https://healthy.com/": '<address>Berlin, Germany</address>',
+    })
+    malformed = job()
+    healthy = job(id="test:healthy:1", company="Healthy", company_key="healthy",
+                  url="https://healthy.com/jobs/1")
+    profiles = CompanyProfiles(sqlite3.connect(":memory:"))
+    profiles.enrich_report([malformed, healthy])
+    assert malformed.screen["hq_country"] is None
+    assert healthy.screen["hq_country"] == "de"
+    assert "example" in caplog.text and "AttributeError" in caplog.text

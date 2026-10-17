@@ -5,13 +5,14 @@ import subprocess
 import sys
 from datetime import date
 from email.utils import formatdate
+from pathlib import Path
 
 import pytest
 import requests
 import yaml
 
 from scanner import board_owner, watchlist
-from scanner.sources import ats
+from scanner.sources import ats, _more_ats
 
 
 @pytest.fixture(autouse=True)
@@ -49,6 +50,51 @@ class Session:
 
     def close(self):
         pass
+
+
+def test_workday_post_honors_a_block_set_by_a_detail_request(clock):
+    url, _ = ats._base("workday", "acme|wd5|External")
+    ats._feedback(url, response(429, headers={"Retry-After": "3600"}))
+    calls = []
+
+    class WorkdaySession:
+        def post(self, target, **kwargs):
+            calls.append(target)
+            return response(data={"jobPostings": [], "total": 0})
+
+    with pytest.raises(requests.HTTPError) as err:
+        _more_ats.rows(WorkdaySession(), "workday", "acme|wd5|External")
+    assert err.value.response.status_code == 429
+    assert calls == []
+
+
+def test_workable_markdown_detail_honors_a_quota_block(clock):
+    url = "https://apply.workable.com/acme/jobs/view/ABC.md"
+    ats._feedback(url, response(429, headers={"Retry-After": "3600"}))
+    session = Session({url: [response(text="Build Python services")]})
+    raw = {"shortcode": "ABC", "title": "Python Engineer", "location": "Remote",
+           "url": url.removesuffix(".md"), "_markdown_detail": url}
+    with pytest.raises(requests.HTTPError) as err:
+        ats._record(raw, {"company": "Acme", "ats": "workable", "board": "acme"}, {}, session)
+    assert err.value.response.status_code == 429
+    assert session.calls == []
+
+
+def test_interrupted_watchlist_save_preserves_the_previous_file(tmp_path, monkeypatch):
+    path = tmp_path / "watchlist.yml"
+    original = [{"company": "Acme", "ats": "lever", "board": "acme"}]
+    watchlist._write(path, original)
+    before = path.read_bytes()
+
+    def partial_write(target, contents, *args, **kwargs):
+        target.write_bytes(contents[:10].encode())
+        raise OSError("disk full during save")
+
+    monkeypatch.setattr(Path, "write_text", partial_write)
+    with pytest.raises(OSError, match="disk full"):
+        watchlist._write(path, original + [{"company": "New", "ats": "ashby", "board": "new"}])
+    assert path.read_bytes() == before
+    assert list(tmp_path.iterdir()) == [path]
 
 
 @pytest.mark.parametrize("getter", [ats.get, ats.get_text])
