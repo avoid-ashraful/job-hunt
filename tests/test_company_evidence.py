@@ -3,6 +3,7 @@
 import json
 import sqlite3
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 import requests
@@ -10,6 +11,7 @@ import requests
 from scanner import company_evidence
 from scanner.company_profile import CompanyProfiles
 from scanner.models import Job
+from scanner.sources.freehire import to_job
 
 
 def job(**kwargs):
@@ -181,3 +183,65 @@ def test_recruitee_explicit_company_country_not_offer_country(monkeypatch):
 
 def test_offer_country_without_company_country_does_not_establish_hq():
     assert company_evidence._company_metadata({"offer": {"company_name": "Example", "country": "India"}})[0] is None
+
+
+def freehire_fixtures():
+    directory = Path(__file__).parent / "fixtures" / "freehire"
+    return to_job(json.loads((directory / "job.json").read_text())), json.loads((directory / "company.json").read_text())
+
+
+def test_freehire_preserves_exact_company_slug_and_resolves_hq(monkeypatch):
+    posting, data = freehire_fixtures()
+    assert posting.company_key == "example"
+    assert posting.ats_metadata == {"freehire_company_slug": "example-inc"}
+    endpoint = "https://freehire.me/api/v1/companies/example-inc?limit=1"
+    calls = network(monkeypatch, {endpoint: data})
+    country, evidence = company_evidence.lookup(posting)
+    assert country == "de"
+    assert "freehire company hq_country" in evidence
+    assert calls == [endpoint]
+
+
+def test_freehire_website_without_scheme_uses_existing_lookup(monkeypatch):
+    posting, data = freehire_fixtures()
+    data["data"]["company"]["hq_country"] = None
+    calls = network(monkeypatch, {
+        "https://freehire.me/api/v1/companies/example-inc?limit=1": data,
+        "https://example.com": '<a href="/imprint">Imprint</a>',
+        "https://example.com/imprint": '<address>Berlin, Germany</address>',
+    })
+    assert company_evidence.lookup(posting)[0] == "de"
+    assert len(calls) == 3
+
+
+@pytest.mark.parametrize("change", ["hiring_countries", "wrong_company", "wrong_website", "malformed", "invalid_json"])
+def test_freehire_unsafe_or_missing_metadata_falls_back(monkeypatch, change):
+    posting, data = freehire_fixtures()
+    posting.ats_metadata = {}  # Old stored postings lack the original freehire slug.
+    company = data["data"]["company"]
+    company["hq_country"] = None
+    company["company_info"] = {}
+    if change == "wrong_company":
+        company.update(name="Other Employer", hq_country="IN")
+    if change == "wrong_website":
+        company["company_info"] = {"website": "https://unrelated.com"}
+    if change == "malformed":
+        data = {"data": []}
+    if change == "invalid_json":
+        data = "not JSON"
+    calls = network(monkeypatch, {
+        "https://freehire.me/api/v1/companies/example?limit=1": data,
+        posting.url: "<p>We hire in India</p>",
+    })
+    assert company_evidence.lookup(posting)[0] is None
+    assert calls[-1] == posting.url
+
+
+def test_freehire_url_reuses_ats_company_metadata(monkeypatch):
+    posting, _ = freehire_fixtures()
+    posting.url = "https://jobs.smartrecruiters.com/Example/123"
+    endpoint = "https://api.smartrecruiters.com/v1/companies/Example/postings/123"
+    calls = network(monkeypatch, {endpoint: {"company": {"name": "Example", "location": {"country": "DE"}},
+                                          "location": {"country": "IN"}}})
+    assert company_evidence.lookup(posting)[0] == "de"
+    assert calls == [endpoint]

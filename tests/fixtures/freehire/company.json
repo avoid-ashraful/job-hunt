@@ -1,0 +1,17 @@
+{
+  "data": {
+    "company": {
+      "slug": "example-inc",
+      "name": "Example, Inc.",
+      "hq_country": "DE",
+      "countries": ["in"],
+      "regions": ["apac"],
+      "remote_regions": ["global"],
+      "company_info": {
+        "website": "example.com",
+        "locations": [{"code": "IN", "name": "India"}]
+      }
+    },
+    "jobs": [{"location": "Bangalore, India", "countries": ["in"]}]
+  }
+}
