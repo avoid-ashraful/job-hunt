@@ -28,6 +28,23 @@ filters:
   max_age_days: 21              # age = earliest of posted date and first-seen date
   not_seen_live_days: 10        # not seen live by the source for this long: probably closed (freehire re-crawls ~weekly)
 
+  company_market:
+    # ISO2 headquarters to rank first within each report tier.
+    allow_hq_countries: [us, ca, gb, de, fr, nl, ie, es, pt, it, pl, se, no, dk, fi, at, be, lu, cz, ee, lv, lt, si, sk, hr, gr, mt, cy, ro, bg, hu, is, li, ch, sg, my, au, nz, jp, il, ae]
+    # ISO2 headquarters to exclude; unknown headquarters stay eligible.
+    deny_hq_countries: [in, bd]
+    # Exclude postings whose only source hiring countries are India/Bangladesh.
+    drop_local_only_locations: true
+    # Verified ISO2 HQ overrides by normalized company key; leave empty unless checked.
+    hq_overrides: {}
+    # Named employer-evidence regexes; posting location alone is never an HQ clue.
+    evidence_patterns:
+      headquarters: '\b(?:headquartered|headquarters|head office|global hq|company is based)\s*(?:is|are|in|at|located in|:|,)\s*(?:the\s+)?(?P<place>[^.;\n]{2,90})'
+      sole_office: '\b(?:our|its|company''s)\s+(?:only|sole|single|main)\s+(?:office|base)\s+(?:is|in|at|located in)\s+(?P<place>[^.;\n]{2,90})'
+      private_limited: '\b(?:pvt\.?\s*ltd\.?|private limited)\b'
+      india_domain: '\b[a-z0-9-]+\.in\b'
+      bangladesh_domain: '\b[a-z0-9-]+\.(?:com\.)?bd\b'
+
   # A title must match at least one family. Order matters: first match wins and is
   # the "role family" used when collapsing seniority within a company.
   role_families:

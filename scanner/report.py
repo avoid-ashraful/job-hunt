@@ -25,7 +25,8 @@ def _salary(job: Job) -> str:
 
 def _sort_key(job: Job):
     fit = (job.screen or {}).get("fit", 0)
-    return (-fit, "global" not in job.regions, -(job.age_anchor.timestamp() if job.age_anchor else 0))
+    return (not (job.screen or {}).get("preferred_hq"), -fit, "global" not in job.regions,
+            -(job.age_anchor.timestamp() if job.age_anchor else 0))
 
 
 def _decided_by(sc: dict) -> str:
@@ -34,8 +35,8 @@ def _decided_by(sc: dict) -> str:
 
 
 def _table(jobs: list[Job], with_why: bool) -> list[str]:
-    head = "| Ref | Mark | Fit | Company | Title | Who can apply | Evidence | Decided by |" + (" Why here |" if with_why else "")
-    lines = [head + " Salary | First seen | Apply |", "|" + "---|" * (head.count("|") + 2)]
+    head = "| Ref | Mark | Fit | Company | HQ | Title | Who can apply | Evidence | Decided by |" + (" Why here |" if with_why else "")
+    lines = [head + " Pay | First seen | Apply |", "|" + "---|" * (head.count("|") + 2)]
     for job in sorted(jobs, key=_sort_key):
         sc = job.screen or {}
         who = sc.get("allowed") or job.location or ", ".join(job.regions) or "-"
@@ -46,9 +47,13 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
         ghost = f"⚠ possible ghost: {', '.join(signals)}" if ghost_score and signals else ""
         why_text = "; ".join(x for x in (sc.get("why", ""), sc.get("prior", ""), ghost) if x)
         why = f" {_cell(why_text)} |" if with_why else ""
+        code = (sc.get("hq_country") or "").upper()
+        hq = f"{''.join(chr(127397 + ord(c)) for c in code)} {code}" if len(code) == 2 else "?"
+        pay = "; ".join(x for x in (sc.get("pay_hint") or _salary(job),
+                                      f"Levels: {sc['pay_tier']}" if sc.get("pay_tier") else "") if x)
         lines.append(
-            f"| `{job_ref(job.id)}` | [ ] | {sc.get('fit', '')}/5 | {_cell(job.company)} | {_cell(job.title)} | {_cell(who)} | "
-            f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_salary(job)} | {seen} | [apply]({job.url}) |"
+            f"| `{job_ref(job.id)}` | [ ] | {sc.get('fit', '')}/5 | {_cell(job.company)} | {hq} | {_cell(job.title)} | {_cell(who)} | "
+            f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_cell(pay)} | {seen} | [apply]({job.url}) |"
         )
     return lines
 
@@ -124,7 +129,7 @@ def reason_bucket(reason: str) -> str:
         return "region locked (rule)"
     if reason.startswith(("agency.", "language.", "role.")):
         return reason.split(":")[0]
-    for prefix in ("ghost job", "closed", "older than", "title excluded", "gig/excluded title", "no Python", "salary max",
+    for prefix in ("company based in", "location only in", "ghost job", "closed", "older than", "title excluded", "gig/excluded title", "no Python", "salary max",
                    "already reported", "lower seniority", "excluded company", "excluded domain",
                    "excluded industry", "company type", "employment type", "not seen live", "staffing/agency company",
                    "us_work_authorization", "security_clearance", "w2_only"):

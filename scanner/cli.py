@@ -22,12 +22,14 @@ import yaml
 from scanner.applications import Applications, STATUSES
 from scanner.marks import sync as sync_marks
 from scanner.companies import load_region_map
+from scanner.company_profile import CompanyProfiles
 from scanner import liveness
 from scanner.dedup import collapse_by_seniority, description_fingerprint, fingerprint
 from scanner.eligibility import NEGATIVE, POSITIVE, Screener, check_evidence
 from scanner.filters import Filters
 from scanner.ghost import GhostRules
 from scanner.models import Job
+from scanner.pay_market import DEFAULT_ALLOW, levels_tiers, salary_usd
 from scanner.report import reason_bucket, write_drop_log, write_report
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
 from scanner import sources
@@ -90,7 +92,12 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         store.upsert(job, today)
 
     # 2. hard filters: title, stack, age, salary, company, hard drops
-    filters = Filters(cfg["filters"], cfg["dedup"]["seniority_rank"], now)
+    market_cfg = cfg["filters"].get("company_market", {})
+    profiles = CompanyProfiles(store.db, market_cfg,
+                               ROOT / cfg["candidate"].get("company_priors", "vendor/remote-jobs/src/companies"))
+    filters = Filters(cfg["filters"], cfg["dedup"]["seniority_rank"], now, profiles)
+    for job in fetched.values():
+        profiles.resolve(job)
     passed = []
     for job in fetched.values():
         if reason := filters.evaluate(job):
@@ -247,6 +254,12 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     stats = {"fetched": len(fetched), "passed": len(passed), "ambiguous": len(ambiguous),
              "llm_calls": screener.calls if screener else 0}
     tiers = Counter(j.bucket for j in kept)
+    pay_tiers = levels_tiers(ROOT / cfg["output"]["state_dir"] / "levels")
+    allow = set(market_cfg.get("allow_hq_countries", DEFAULT_ALLOW))
+    for job in kept:
+        job.screen["preferred_hq"] = job.screen.get("hq_country") in allow
+        job.screen["pay_hint"] = salary_usd(job, cfg["filters"]["salary"])
+        job.screen["pay_tier"] = pay_tiers.get(job.company_key, "")
     log.info("fetched %s, passed filters %s, ambiguous→AI %s, kept %s (apply %s, check %s, long shots %s)",
              len(fetched), len(passed), len(ambiguous), len(kept), tiers["apply"], tiers["check"], tiers["longshot"])
     for reason, count in drop_counts.most_common():
