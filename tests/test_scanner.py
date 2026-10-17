@@ -317,7 +317,7 @@ def test_audit_safeguards_reach_private_prompts_and_invalidate_cache(tmp_path, m
     old_hash = hashlib.sha256((old_system + json.dumps(eligibility.BATCH_SCHEMA, sort_keys=True)).encode()).hexdigest()[:12]
     db.execute("INSERT INTO llm_location (job_id, prompt_hash, model, result, created_at) VALUES (?, ?, ?, ?, ?)",
                ("job", old_hash, "test", json.dumps(BASE), "2026-10-16"))
-    assert screener._cached(make_job(id="job")) is None
+    assert screener._cached(make_job(id="job"), []) is None
 
 
 def test_screener_runs_batches_in_threads_and_logs_calls(tmp_path, monkeypatch):

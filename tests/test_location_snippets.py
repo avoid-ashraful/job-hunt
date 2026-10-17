@@ -138,4 +138,4 @@ def test_extraction_update_invalidates_cached_verdicts(tmp_path, monkeypatch):
                ("test:1", old_hash, "test", '{}', "2026-10-17"))
     job = Job(id="test:1", source="test", url="https://example.com/job", title="Engineer",
               company="Example", company_key="example", description="US work authorization required.")
-    assert screener._cached(job) is None
+    assert screener._cached(job, []) is None

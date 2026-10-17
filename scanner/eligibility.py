@@ -291,31 +291,20 @@ class Screener:
     def _job_text(cls, ref: str, job: Job, snippets: list[str]) -> str:
         return f"### JOB {ref}\n" + cls._content_text(job, snippets)
 
-    def _cached(self, job: Job, snippets: list[str] | None = None) -> dict | None:
+    def _cached(self, job: Job, snippets: list[str]) -> dict | None:
         row = self.db.execute(
             "SELECT result, content_hash FROM llm_location WHERE job_id = ? AND prompt_hash = ?",
             (job.id, self.prompt_hash),
         ).fetchone()
         if not row:
             return None
-        result_json, cached_hash = row[0], row[1]
-        if snippets is None:
-            snippets = job.screen.get("snippets")
-        if snippets is not None:
-            current_hash = self.content_hash(job, snippets)
-            if cached_hash is None:
-                # Store hash on first read-hit to avoid an LLM quota burst on legacy rows, missing only on later changes.
-                self.db.execute(
-                    "UPDATE llm_location SET content_hash = ? WHERE job_id = ? AND prompt_hash = ?",
-                    (current_hash, job.id, self.prompt_hash),
-                )
-                self.db.commit()
-                return json.loads(result_json)
-            if cached_hash != current_hash:
-                return None
-        elif cached_hash is not None:
+        current = self.content_hash(job, snippets)
+        if row[1] is None:  # legacy row: adopt today's text instead of re-screening everything at once
+            self.db.execute("UPDATE llm_location SET content_hash = ? WHERE job_id = ? AND prompt_hash = ?",
+                            (current, job.id, self.prompt_hash))
+        elif row[1] != current:
             return None
-        return json.loads(result_json)
+        return json.loads(row[0])
 
     def _batch(self, batch: list[tuple[Job, list[str]]], purpose: str) -> tuple[dict[str, dict], str]:
         refs = {f"J{i + 1}": item for i, item in enumerate(batch)}
