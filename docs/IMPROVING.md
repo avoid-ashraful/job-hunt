@@ -59,10 +59,12 @@ comparing a dry run: `uv run python -m scanner run --dry-run --days 3`.
 
 The weekly script is `scripts/weekly-learn.sh`. Install `0 5 * * 6 /home/ubuntu/job_hunt/scripts/weekly-learn.sh` in the UTC server crontab for 11:00 Saturday in Asia/Dhaka.
 
+Salary ranges missing from source fields are conservatively parsed from descriptions before filtering; Pay preserves the matched text, while comparisons use configured currency rates and annual multipliers (currencyless ranges are display-only).
+
 ## Watchlist probing
 
 `scanner watchlist build` shares adaptive backoff across each ATS provider after a 429,
-using Retry-After (up to 60 seconds) or exponential delays, then reducing delays after
+using Retry-After (up to 60 seconds; a longer Retry-After skips that host until it ends) or exponential delays, then reducing delays after
 successful requests. Probes retry once before recording a rate limit. Later builds
 retry only the unresolved boards, after fresh seeds, without the website-failure
 cooldown or attempt limit. Older rate-limited caches are also retried, even if marked dead.

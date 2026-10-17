@@ -32,6 +32,7 @@ from scanner.ghost import GhostRules
 from scanner.models import Job
 from scanner.pay_market import DEFAULT_ALLOW, levels_tiers, salary_usd
 from scanner.report import reason_bucket, write_drop_log, write_report
+from scanner.salary import fill_salary
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
 from scanner import sources
 from scanner.store import Store
@@ -148,6 +149,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         else:
             _fill_missing(have, job)
     for job in fetched.values():
+        fill_salary(job)
         store.upsert(job, today)
 
     # 2. hard filters: title, stack, age, salary, company, hard drops
