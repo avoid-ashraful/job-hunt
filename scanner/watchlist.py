@@ -373,6 +373,8 @@ def resolve_company(company: dict, session: requests.Session | None = None,
             retry_trusted = {tuple(p) for p in company.get("retry_trusted", [])}
             for ats, board in company["retry_probes"]:
                 trust = (ats, board) in retry_trusted
+                if not trust and ats not in ATS_ORDER:  # a guess on an ATS we no longer guess (Workable)
+                    continue
                 result = probe(ats, board, "careers link" if trust else "verified slug", trust)
                 if result:
                     return result

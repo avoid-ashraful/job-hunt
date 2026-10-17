@@ -410,3 +410,9 @@ def test_quota_window_fails_fast_instead_of_stalling(clock):
     session.routes[other] = [response(data={"jobs": []})]
     ats.get(session, other)
     assert session.calls[-1] == other
+
+
+def test_retry_skips_guesses_for_ats_no_longer_guessed():
+    session = Session()
+    result = watchlist.resolve_company({"company": "Acme", "retry_probes": [["workable", "acme"]], "retry_trusted": []}, session)
+    assert session.calls == [] and result == {"reason": "no supported ATS board found"}
