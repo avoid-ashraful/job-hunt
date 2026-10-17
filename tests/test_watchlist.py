@@ -213,8 +213,10 @@ def test_grow_uses_evidence_and_ats_ids(tmp_path):
     db.executescript("CREATE TABLE jobs(id TEXT, payload TEXT); CREATE TABLE decisions(job_id TEXT, outcome TEXT, stage TEXT); CREATE TABLE feedback(job_id TEXT, label TEXT);")
     payload = {"company": "Example", "source": "freehire", "regions": ["global"]}
     db.execute("INSERT INTO jobs VALUES (?, ?)", ("greenhouse:example:123", json.dumps(payload)))
+    untagged = {"company": "Other", "source": "freehire", "regions": ["north_america"]}
+    db.execute("INSERT INTO jobs VALUES (?, ?)", ("greenhouse:other:9", json.dumps(untagged)))
     result = watchlist.grow(db, tmp_path / "watch.yml")
-    assert result["added"] == 1
+    assert result["added"] == 1  # a freehire job without global evidence doesn't make its company watched
     assert watchlist.list_entries(tmp_path / "watch.yml")[0]["board"] == "example"
 
 

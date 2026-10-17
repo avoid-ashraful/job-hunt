@@ -861,7 +861,7 @@ def grow(db: sqlite3.Connection, watchlist_file: Path, *, deny_countries: tuple[
             continue
         src = job.get("source") or "ats"
         regions = job.get("regions") or []
-        if "global" in regions or src == "freehire":
+        if "global" in regions:
             selected.setdefault(job_id, set()).add(src)
 
     for job_id, in db.execute("SELECT DISTINCT job_id FROM decisions WHERE outcome IN ('eligible', 'apply') AND stage IN ('location', 'llm', 'report')"):
