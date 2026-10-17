@@ -16,6 +16,7 @@ from urllib.parse import quote, urljoin, urlparse
 import requests
 import yaml
 
+from scanner import board_health
 from scanner.board_owner import AGGREGATORS, DEMO, _domain, owns
 
 OWNER_CHECK = 2  # bump when the ownership check changes, so earlier verdicts are redone
@@ -610,10 +611,31 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
         except Exception as exc:
             log.warning("Could not read worldwide DB evidence: %s", exc)
 
+    retry_boards = {}
+    health_dir = cache_dir.parent / "watchlist_health"
+    seed_keys = {normalize_company(seed["company"]) for seed in seeds}
+    for key, entry in by_key.items():
+        inactive = entry.get("status") == "inactive"
+        if not inactive and not (entry.get("ats") and entry.get("board") and board_health.stale(
+            board_health.read(health_dir, entry["ats"], entry["board"])
+        )):
+            continue
+        retry_boards[key] = entry.get("previous_board") if inactive else [entry["ats"], entry["board"]]
+        if key not in seed_keys:
+            seeds.append(dict(entry))
+        entry.pop("ats", None)
+        entry.pop("board", None)
+        entry.update(status="inactive", inactive_since=entry.get("inactive_since", date.today().isoformat()),
+                     previous_board=retry_boards[key])
+        (cache_dir / f"{key}.json").unlink(missing_ok=True)
+
     hints = _database_hints(db_path)
     filters_cfg = (cfg or {}).get("filters") or {}
 
     stats = {
+        "re_resolved": len(retry_boards),
+        "moved": 0,
+        "inactive": 0,
         "worldwide": len(seeds),
         "resolved": 0,
         "failed": 0,
@@ -633,6 +655,14 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
 
     for seed in seeds:
         key = normalize_company(seed["company"])
+        if key in retry_boards:
+            for field, value in by_key[key].items():
+                seed.setdefault(field, value)
+            if [seed.get("ats"), seed.get("board")] == retry_boards[key]:
+                seed.pop("ats", None)
+                seed.pop("board", None)
+            for field in ("status", "inactive_since", "previous_board"):
+                seed.pop(field, None)
         seed["_ats_order"] = ats_order
         existing = by_key.get(key)
         seed["hq_country"] = _hq(existing or seed, hq_lookup)
@@ -783,6 +813,10 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
         pool.shutdown(wait=False, cancel_futures=True)
     _write(watchlist_file, list(by_key.values()))
     stats["failure_reasons"] = dict(failures)
+    stats["moved"] = sum(key in by_key and by_key[key].get("ats") is not None
+                         and by_key[key]["ats"] != old[0] for key, old in retry_boards.items() if old)
+    stats["inactive"] = sum(c.get("status") == "inactive" for c in by_key.values())
+    print(f"Watchlist: re-resolved {stats['re_resolved']}, moved to another ATS {stats['moved']}, inactive {stats['inactive']}")
     return stats
 
 

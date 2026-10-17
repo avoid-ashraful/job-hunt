@@ -36,7 +36,7 @@ from scanner.salary import fill_salary
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
 from scanner import sources
 from scanner.store import Store
-from scanner import seed_sources, watchlist
+from scanner import board_health, seed_sources, watchlist
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = ROOT / "private" / "config" / "config.yml"
@@ -135,9 +135,10 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     watch_cfg = cfg.get("sources", {}).get("ats", {})
     watch_path = ROOT / watch_cfg.get("watchlist_file", "private/config/watchlist.yml")
     if "ats" in source_cfg:
-        source_cfg["ats"] = {**source_cfg["ats"], "filters": cfg["filters"], "watchlist_file": str(watch_path)}
+        source_cfg["ats"] = {**source_cfg["ats"], "filters": cfg["filters"], "watchlist_file": str(watch_path),
+                             "health_dir": str(ROOT / cfg["output"]["state_dir"] / "watchlist_health")}
     denied = {str(c).lower() for c in watch_cfg.get("hq_deny_countries", ["in", "bd"])}
-    watched = [c for c in watchlist.list_entries(watch_path) if str(c.get("hq_country") or "").lower() not in denied]
+    watched = [c for c in watchlist.list_entries(watch_path) if c.get("status") != "inactive" and str(c.get("hq_country") or "").lower() not in denied]
     watched_keys = {watchlist.normalize_company(c["company"]) for c in watched}
     watched_boards = {(c.get("ats"), c.get("board")) for c in watched}
     source_stats = []
@@ -467,5 +468,12 @@ def main() -> None:
             _, store = load(args.config)
             print(watchlist.grow(store.db, path, deny_countries=denied, cfg=cfg))
         else:
+            health_dir = ROOT / cfg["output"]["state_dir"] / "watchlist_health"
+            print("Company\tATS/board\tHQ\tHires\tStatus\tLast ok\tJobs\tFailures (404/410 / other)")
             for company in watchlist.list_entries(path):
-                print(f"{company['company']}\t{company.get('ats', '-')}/{company.get('board', '-')}\t{company.get('hq_country', '')}\t{company.get('hires', '')}")
+                board = company.get("previous_board") if company.get("status") == "inactive" else None
+                board = board or [company.get("ats", ""), company.get("board", "")]
+                health = board_health.read(health_dir, *board)
+                print(f"{company['company']}\t{company.get('ats', '-')}/{company.get('board', '-')}\t{company.get('hq_country', '')}\t{company.get('hires', '')}\t{company.get('status', 'active')}"
+                      f"\t{health.get('last_ok', '-')}\t{health.get('jobs', '-')}"
+                      f"\t{health.get('not_found_failures', 0)}/{health.get('other_failures', 0)}")
