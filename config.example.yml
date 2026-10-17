@@ -106,9 +106,10 @@ filters:
     python:     ['\bpython\b', '\bdjango\b', '\bfastapi\b']
     backend:    ['back[\s-]?end', '\bapi\b', 'platform engineer', 'server[\s-]?side']
     fullstack:  ['full[\s-]?stack']
-    applied_ai: ['applied ai']
+    applied_ai: ['applied ai', '\b(ai|llm|gen(erative)?\s?ai|agentic( ai)?)\s+(software\s+)?(engineer|developer)\b', '\bai (platform|application|product|systems?) engineer\b']
     software:   ['software (engineer|developer|development engineer)', '\bswe\b', '\bsde\b']
     generic:    ['^\W*((sr\.?|senior|staff|lead|principal)\s+)*(engineer|developer)\b']
+    startup:    ['\bfounding (software |backend |full[\s-]?stack )?engineer\b', '\bmember of technical staff\b', '\bproduct engineer\b']
 
   title_exclude:
     - 'front[\s-]?end'
