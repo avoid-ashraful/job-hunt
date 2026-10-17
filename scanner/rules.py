@@ -94,6 +94,10 @@ class LocationRules:
 
     def classify(self, job: Job) -> Verdict:
         locks, positives, weak, zones, snippets = [], [], [], [], []
+        ats_global = self.positive.get("ats_location_global")
+        if job.watchlist and ats_global and ats_global.search(job.location):
+            positives.append(("positive.ats_location_global", job.location, ""))
+            snippets.append(job.location)
         for sent in sentences(job.description):
             if self.ignore.search(sent):
                 continue
@@ -119,6 +123,8 @@ class LocationRules:
                         positives.append((f"weak_lock_place_ok.{name}", sent, _place(m)))
                         hit = True
             for name, rx in self.positive.items():
+                if name == "ats_location_global":
+                    continue
                 if not perk and rx.search(sent):
                     positives.append((f"positive.{name}", sent, ""))
                     hit = True

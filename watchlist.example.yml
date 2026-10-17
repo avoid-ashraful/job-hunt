@@ -1,0 +1,9 @@
+# Copy to private/config/watchlist.yml. The scanner updates this file with build/grow.
+companies:
+  - company: Supabase
+    ats: ashby
+    board: supabase
+    hq_country: us
+    hires: worldwide
+    source: remoteintech
+    added: '2026-10-17'

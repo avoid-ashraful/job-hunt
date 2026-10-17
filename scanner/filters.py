@@ -27,6 +27,7 @@ class Filters:
         self.profiles = profiles
         self.market = cfg.get("company_market", {})
         self.max_age = timedelta(days=cfg["max_age_days"])
+        self.max_age_watchlist = timedelta(days=cfg.get("max_age_days_watchlist", 120))
         self.stale_after = timedelta(days=cfg.get("not_seen_live_days", 10))
         self.families = {name: _rx(pats) for name, pats in cfg["role_families"].items()}
         self.title_exclude = _rx(cfg["title_exclude"])
@@ -53,6 +54,8 @@ class Filters:
         self.title_keywords = _rx(ex.get("title_keywords", []))
         self.company_name_keywords = _rx(ex.get("company_name_keywords", []))
         self.summary_keywords = _rx(ex.get("summary_keywords", []))
+        self.description_domains = {name: (re.compile(d["pattern"], re.I), d.get("min_hits", 3))
+                                    for name, d in (ex.get("description_domains") or {}).items()}
         self.non_english = cfg.get("non_english", "flag")
         self.seniority_rank = seniority_rank
 
@@ -98,9 +101,10 @@ class Filters:
 
     def _age(self, job: Job) -> str | None:
         anchor = job.age_anchor
-        if anchor and self.now - anchor > self.max_age:
-            return f"older than {self.max_age.days} days (first seen {anchor:%Y-%m-%d})"
-        if job.last_seen_at and self.now - job.last_seen_at > self.stale_after:
+        max_age = self.max_age_watchlist if job.watchlist else self.max_age
+        if anchor and self.now - anchor > max_age:
+            return f"older than {max_age.days} days (first seen {anchor:%Y-%m-%d})"
+        if not job.watchlist and job.last_seen_at and self.now - job.last_seen_at > self.stale_after:
             return f"not seen live since {job.last_seen_at:%Y-%m-%d} (probably closed)"
         return None
 
@@ -136,6 +140,10 @@ class Filters:
             return f"excluded domain {sorted(hit)}"
         if m := _first(self.summary_keywords, job.summary):
             return f"excluded industry ('{m.group(0)}')"
+        if not job.domains:  # sources without industry tags (live ATS boards, HN): judge from the text
+            for name, (rx, min_hits) in self.description_domains.items():
+                if len(rx.findall(job.description)) >= min_hits:
+                    return f"excluded domain ['{name}'] (from description)"
         return None
 
     def _hard_drop(self, job: Job) -> str | None:
