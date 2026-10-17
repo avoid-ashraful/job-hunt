@@ -5,4 +5,5 @@ cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$PATH"
 mkdir -p private/state/logs
 log="private/state/logs/weekly-watchlist-$(TZ=Asia/Dhaka date +%F).log"
+uv run python -m scanner watchlist seeds >>"$log" 2>&1 || true  # a dead seed list must not block the rebuild
 uv run python -m scanner watchlist build >>"$log" 2>&1
