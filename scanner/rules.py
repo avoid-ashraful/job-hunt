@@ -117,7 +117,14 @@ class LocationRules:
                     kind = self._place_kind(m, name)
                     hit = hit or (kind != "neutral" and not (perk and kind == "candidate"))
                     if kind == "lock":
-                        locks.append((f"lock.{name}", sent, _place(m)))
+                        # Pay disclosures and preferred locations don't restrict who can apply.
+                        context = sent[max(0, m.start() - 100):m.end()]
+                        advisory = re.search(r"\b(?:prefer(?:ence|red|ably)|ideally)\b", context, re.I)
+                        pay = re.search(r"\b(?:salary range|compensation varies)\b", sent, re.I)
+                        if advisory or pay:
+                            weak.append((f"weak_lock.{name}", sent, _place(m)))
+                        else:
+                            locks.append((f"lock.{name}", sent, _place(m)))
                     elif kind == "candidate" and not perk:
                         positives.append((f"lock_place_ok.{name}", sent, _place(m)))
                     elif kind == "timezone":

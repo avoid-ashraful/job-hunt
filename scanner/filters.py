@@ -106,7 +106,8 @@ class Filters:
         anchor = job.age_anchor
         max_age = self.max_age_watchlist if job.watchlist else self.max_age
         if anchor and self.now - anchor > max_age:
-            if not job.watchlist and self.now - anchor < self.max_age_live and liveness.can_verify(job):
+            live_board = job.watchlist and job.source == "ats"
+            if (live_board or (not job.watchlist and self.now - anchor < self.max_age_live)) and liveness.can_verify(job):
                 job.screen["needs_live"] = True
             else:
                 return f"older than {max_age.days} days (first seen {anchor:%Y-%m-%d})"
@@ -132,6 +133,9 @@ class Filters:
         return None
 
     def _employment(self, job: Job) -> str | None:
+        # Recruitee distinguishes permanent employment and B2B freelance contracts.
+        job.employment_type = {"full_time_permanent": "full_time", "freelance": "contract"}.get(
+            job.employment_type, job.employment_type)
         if self.employment_types and job.employment_type and job.employment_type not in self.employment_types:
             return f"employment type {job.employment_type}"
         return None

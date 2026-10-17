@@ -378,7 +378,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         store.log_decision(today, job.id, "report", job.screen.get("decided_by", ""), job.bucket,
                            job.screen.get("why", ""))
     store.log_run(now.isoformat(), len(fetched), len(passed), len(kept), len(kept),
-                  str(report.relative_to(ROOT)), 0, source_stats)
+                  str(report.relative_to(ROOT) if report.is_relative_to(ROOT) else report), 0, source_stats)
     store.commit()
     if watch_cfg.get("enabled"):
         stats_grow = watchlist.grow(store.db, watch_path, deny_countries=tuple(denied), cfg=cfg)

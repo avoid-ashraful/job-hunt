@@ -305,7 +305,7 @@ rules:
       - '\boriginally posted (?:on|at)\b'
   role:
     agency:
-      for_our_client: '\b(?:for|on behalf of)\s+(?:our|a|one of our)\s+(?:client|customer|partner)s?\b'
+      for_our_client: '\bon behalf of\s+(?:our|a|one of our)\s+clients?\b|\b(?:hiring|recruiting|seeking|looking)\b[^.;\n]{0,100}\bfor\s+(?:our|a|one of our)\s+clients?\b'
       our_client_is: '\bour client(?:\s+is|,)'
       our_partner_is: '\bour (?:partner|client) is (?:looking|seeking|hiring|searching)\b'
       staffing: '\b(?:staff augmentation|outstaff\w*|outsourc\w+ (?:company|agency|partner)|body ?shop|nearshore|near-shore|recruit(?:ing|ment) (?:agency|firm|partner)|staffing (?:agency|firm|company)|talent (?:agency|marketplace))\b'

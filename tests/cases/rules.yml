@@ -354,6 +354,25 @@
   expected:
     outcome: drop
     rule: agency.for_our_client
+- name: product-company-customer-outcomes
+  stage: role
+  job:
+    description: Build Python services and deliver meaningful outcomes for our customers.
+  expected:
+    outcome: keep
+- name: product-company-client-outcomes
+  stage: role
+  job:
+    description: For our clients, this means better health outcomes and operational efficiency.
+  expected:
+    outcome: keep
+- name: agency-on-behalf-of-client
+  stage: role
+  job:
+    description: On behalf of our client from the UK, we are looking for a Senior Python Engineer.
+  expected:
+    outcome: drop
+    rule: agency.for_our_client
 - name: german-posting
   stage: role
   job:
@@ -384,3 +403,15 @@
     description: Python, Django, Celery, Postgres, Redis, AWS, Docker
   expected:
     outcome: 5
+- name: preferred-location-goes-to-ai
+  stage: location
+  job:
+    description: Ideally you are located in the United States.
+  expected:
+    outcome: ambiguous
+- name: us-salary-range-goes-to-ai
+  stage: location
+  job:
+    description: The salary range for candidates located in the United States is $150,000 - $190,000.
+  expected:
+    outcome: ambiguous

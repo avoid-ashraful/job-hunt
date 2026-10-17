@@ -5,22 +5,25 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import yaml
+import pytest
 
 from scanner import cli, sources
 from scanner.models import Job
 from scanner.store import Store
 
 
-def test_run_records_source_health(tmp_path, monkeypatch, caplog):
+@pytest.mark.parametrize("external_output", [False, True])
+def test_run_records_source_health(tmp_path, monkeypatch, caplog, external_output):
     cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
     cfg["run"] = {"fetch_workers": 1}
     cfg["sources"] = {"broken": {"enabled": True}, "freehire": {"enabled": True},
                       "empty": {"enabled": True}, "disabled": {"enabled": False}}
-    cfg["output"] = {"jobs_dir": "jobs", "state_dir": "state"}
+    cfg["output"] = {"jobs_dir": str(tmp_path / "jobs") if external_output else "jobs",
+                     "state_dir": str(tmp_path / "state") if external_output else "state"}
     cfg["liveness"]["enabled"] = False
     config = tmp_path / "config.yml"
     config.write_text(yaml.safe_dump(cfg, sort_keys=False))
-    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "ROOT", tmp_path / "repo" if external_output else tmp_path)
     job = Job(id="test:1", source="freehire", url="https://example.com/job", company="Example",
               company_key="example", title="Sales manager", description="Sales")
 
@@ -38,6 +41,9 @@ def test_run_records_source_health(tmp_path, monkeypatch, caplog):
         report = cli.run(config, dry_run=False, days=1, skip_llm=True)
 
     db = sqlite3.connect(tmp_path / "state" / "scanner.sqlite")
+    saved_report = db.execute("SELECT report FROM runs").fetchone()[0]
+    assert saved_report == str(report) if external_output else saved_report == "jobs/" + report.name
+    assert (tmp_path / "state" / "dropped" / (report.stem + ".tsv")).exists()
     stats = json.loads(db.execute("SELECT source_stats FROM runs").fetchone()[0])
     assert stats == [
         {"name": "broken", "count": 1, "seconds": 3, "error": "RuntimeError: HTTP 403\nblocked"},
