@@ -300,8 +300,13 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
             job.screen["prior"] = f"remoteintech lists this company as hiring: {prior}"
         # a region tag like apac is compatible, unless the source pinned it to other countries (apac + India)
         tag_ok = "global" in job.regions or (ok_tags & set(job.regions) and (not job.countries or code in job.countries))
-        if prior == "worldwide" or not job.regions or tag_ok:
+        # The employer's own board naming other countries outranks a company-level "hires worldwide" prior.
+        pinned = job.source == "ats" and job.countries and code not in job.countries and "global" not in job.regions
+        if not pinned and (prior == "worldwide" or not job.regions or tag_ok):
             job.bucket = "check"
+        elif pinned:
+            job.bucket = "longshot"
+            job.screen["why"] = (job.screen.get("why", "") + f"; employer lists {', '.join(job.countries)} only").lstrip("; ")
         else:
             job.bucket = "longshot"
             where = ", ".join(job.countries) if ok_tags & set(job.regions) else ", ".join(job.regions)

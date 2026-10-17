@@ -483,6 +483,9 @@ def _record(raw: dict, company: dict, cfg: dict, session: requests.Session) -> J
             return None
 
     regions, countries = _location_tags(location, cfg)
+    code = str((raw.get("location") or {}).get("country") or "").lower() if ats == "smartrecruiters" else ""
+    if re.fullmatch(r"[a-z]{2}", code) and code not in countries:  # SmartRecruiters gives an ISO code, not a name
+        countries.append(code)
     minimum, maximum, currency, period = _salary(raw, ats)
     employment = raw.get("employmentType") or raw.get("commitment") or raw.get("employment_type_code")
     if isinstance(employment, dict):
