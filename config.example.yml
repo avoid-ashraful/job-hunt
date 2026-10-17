@@ -12,6 +12,7 @@ candidate:
   resume: private/profile/resume.pdf
 
 sources:
+  # Sources run in this order; when two return the same job id, the first copy wins.
   freehire:
     enabled: true
     base_url: https://freehire.me/api/v1
@@ -23,6 +24,28 @@ sources:
     daily_lookback_days: 3      # overlap on later runs; dedup removes repeats
     page_size: 100
     request_delay_s: 1.0
+  hn:
+    enabled: true                  # HN jobs index and current/previous Who-is-hiring threads
+    jobs_page: true                # include YC-style HN jobs posts
+    max_job_pages: 2              # bound index requests per run
+    max_comment_pages: 15         # bound pages per monthly hiring thread
+    request_delay_s: 1.0          # pause between Algolia API pages
+    remote_pattern: '\bremote\b' # only explicitly remote posts
+    worldwide_pattern: '\b(worldwide|anywhere in the world|remote globally|global remote)\b' # strong location label
+    role_pattern: '\b(?:(?:senior|staff|lead|principal)\s+)?(?:python|django|backend|back-end|platform|software|fullstack|full-stack|api)\s+(?:engineer|developer)\b' # role extraction
+  himalayas:
+    enabled: true                  # public Himalayas worldwide job search
+    base_url: https://himalayas.app/jobs/api/search # documented search endpoint
+    queries: [python, django, backend] # API keyword searches
+    max_pages_per_query: 3        # bound shared public API use
+    request_delay_s: 1.0          # pause between API pages
+    # api_key: ''                 # optional free key; higher rate allowance
+  workable:
+    enabled: true                  # public Workable cross-company remote search
+    base_url: https://jobs.workable.com/api/v1/jobs # search endpoint
+    queries: [python, django, backend] # API keyword searches
+    max_pages_per_query: 3        # bound requests per query
+    request_delay_s: 1.0          # pause between API pages
 
 filters:
   max_age_days: 21              # age = earliest of posted date and first-seen date

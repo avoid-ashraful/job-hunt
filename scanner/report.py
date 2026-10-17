@@ -53,7 +53,8 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
                                       f"Levels: {sc['pay_tier']}" if sc.get("pay_tier") else "") if x)
         lines.append(
             f"| `{job_ref(job.id)}` | [ ] | {sc.get('fit', '')}/5 | {_cell(job.company)} | {hq} | {_cell(job.title)} | {_cell(who)} | "
-            f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_cell(pay)} | {seen} | [apply]({job.url}) |"
+            f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_cell(pay)} | {seen} | "
+            f"[{('Himalayas apply' if job.source == 'himalayas' else 'apply')}]({job.url}) |"
         )
     return lines
 

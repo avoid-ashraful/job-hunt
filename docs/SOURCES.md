@@ -1,0 +1,22 @@
+# Job source feasibility (probed from this VPS, 2026-10-17)
+
+The scanner only reads public endpoints, identifies itself, and follows published access rules. A remote label alone does not establish Bangladesh eligibility; the existing location and company rules make that decision.
+
+| Site | Feasible? / method | Auth | Robots and terms | Value for this candidate | Decision |
+|---|---|---|---|---|---|
+| [HN jobs](https://news.ycombinator.com/jobs) | Yes; posts indexed as `job` stories in the public Algolia API | None | `robots.txt` allows `/jobs` with 30 s crawl delay; scanner uses Algolia JSON | Medium; direct startup posts, but many US only | Add via job index |
+| [Ask HN: Who is hiring?](https://hn.algolia.com/api) | Yes; Algolia story/comment JSON, current and previous month | None | Algolia `robots.txt` returned 404; API is [documented](https://hn.algolia.com/api) | High; direct employer comments often state remote geography | Add, top-level remote comments |
+| [Himalayas](https://himalayas.app/docs/remote-jobs-api) | Yes; `/jobs/api/search` with `worldwide=true` | No key needed; free key raises quota | [Robots](https://himalayas.app/robots.txt) allows API path; [terms](https://himalayas.app/terms) require a Himalayas application link and attribution | High for location, mixed quality for pay/company | Add; retain Himalayas link as application URL |
+| [Workable search](https://jobs.workable.com/) | Yes; public `/api/v1/jobs?query=…&workplace=remote` JSON | None | [Robots](https://jobs.workable.com/robots.txt) restricts search-page query URLs, not API; use low-rate API calls | Medium; employer ATS jobs but many country restricted | Add; `remote=true` yielded zero, `workplace=remote` works |
+| [Wellfound](https://wellfound.com/jobs) | Limited; public HTML loads but search paths are restricted | Search/login may require account | [Robots](https://wellfound.com/robots.txt) disallows `/search` and `/_jobs/`; no bypass | Medium if signed in, low as feed | Skip automation |
+| [Built In](https://builtin.com/jobs/remote) | Limited; public HTML and job sitemap | None for public pages | [Robots](https://builtin.com/robots.txt) blocks `/search/` and some job query patterns | Low; primarily US market and US hiring restrictions | Skip broad crawling |
+| [Indeed](https://www.indeed.com/) | No reliable feed from this IP; search returned 403 | None for browsing | [Robots](https://www.indeed.com/robots.txt) restricts some endpoints; no anti-bot evasion | Low; mostly US authorization | Skip JobSpy dependency |
+| [ZipRecruiter](https://www.ziprecruiter.com/) | No; search returned Cloudflare 403 | None for browsing | [Robots](https://www.ziprecruiter.com/robots.txt) disallows `/` for generic agents | Low; mostly US authorization | Skip JobSpy dependency |
+| [Jobright](https://jobright.ai/remote-jobs) | Public landing page, no verified public job API | Account for personalized matching | [Robots](https://jobright.ai/robots.txt) allows public jobs but restricts recommendations/profile | Low; largely US market | Skip until supported public feed exists |
+| [FlexJobs](https://www.flexjobs.com/) | VPS request timed out | Paid account for full listings | Robots could not be checked from this VPS; no paid access automation | Low until subscribed | User may subscribe manually |
+| [G2i](https://www.g2i.co/) | Public marketplace landing page; no public job feed found | Developer application | `robots.txt` returned 404; no listing endpoint verified | Possible high-paying contracts after vetting | User should apply to join |
+| [MyGreenhouse](https://my.greenhouse.io/users/sign_in) | Sign-in returned 406; no public search endpoint verified | Job-seeker login | [Robots](https://my.greenhouse.io/robots.txt) allows `/`; access still requires service consent | Low incremental value over public Greenhouse boards | Skip; use ATS boards |
+| [Levels.fyi](https://www.levels.fyi/?tab=levels) | Public site, no stable documented salary JSON verified | Public browsing | [Robots](https://www.levels.fyi/robots.txt) allows generic agents; API terms/access unverified | Salary context, not jobs | No fetcher until a supported API is found |
+| Overleaf software-engineer resume template | Not a job source | Usually Overleaf account to edit | Not relevant to scanner | Resume aid only | Skip |
+
+The [Himalayas API](https://himalayas.app/api) refreshes daily and warns that unauthenticated callers share a public allowance. A free key is optional if the daily request budget becomes unreliable.
