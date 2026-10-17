@@ -58,6 +58,16 @@ BATCH_NOTE = (
     "\n\n## Batch format\nYou will receive several postings, each starting with `### JOB <ref>`, followed by "
     "its title, tags and the sentences from its description that mention location. Judge each one "
     "independently and return one entry per posting in `results`, with `job_ref` set to its ref."
+    "\n\n## Evidence safeguards\n"
+    "A bare 'work from anywhere' perk is unclear unless the text establishes worldwide hiring. "
+    "Existing employees' locations and optional office locations do not establish hiring restrictions. "
+    "A partial country list introduced by 'including' does not prove an unlisted country is excluded. "
+    "A location label alone is unclear, even when repeated in the description. "
+    "No visa sponsorship or conditional export/security checks alone do not prove that foreign work "
+    "authorization is required. Quote an explicit requirement for work_authorization_required. "
+    "Role-specific residence and authorization requirements take precedence over global-team slogans "
+    "and working-hours flexibility. 'Based between' geographic endpoints restricts residence; "
+    "working hours or overlap alone does not. When the supplied evidence conflicts, use unclear."
 )
 CACHE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS llm_location (
@@ -87,12 +97,12 @@ def _norm(text: str) -> str:
 
 
 def check_evidence(job: Job, r: dict) -> dict:
-    """A lock or "anywhere" verdict must quote the description body, not the title or tags.
+    """Positive and negative verdicts must quote the description body, not the title or tags.
 
     Otherwise it is downgraded to "unclear", so the job lands in Check instead of
     being dropped (or trusted) on metadata alone.
     """
-    if r["eligibility"] not in POSITIVE | {"region_locked"}:
+    if r["eligibility"] not in POSITIVE | NEGATIVE:
         return r
     ev = _norm(r.get("eligibility_evidence") or "").strip("\"' .")
     meta = [_norm(x) for x in (job.title, job.location, *job.regions, *job.countries) if x]
@@ -100,7 +110,8 @@ def check_evidence(job: Job, r: dict) -> dict:
         ev == m or ev in m for m in meta
     )
     body = _norm(job.description)
-    quoted = all(part.strip(" .,;") in body for part in re.split(r"\.\.\.|…", ev) if part.strip(" .,;"))
+    parts = [part.strip(" .,;") for part in re.split(r"\.\.\.|…", ev) if part.strip(" .,;")]
+    quoted = bool(parts) and all(part in body for part in parts)
     if from_meta or not quoted:
         return {**r, "eligibility": "unclear",
                 "allowed_locations": f"{r['allowed_locations']} (model said {r['eligibility']}, no quote from the text)"}

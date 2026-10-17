@@ -255,6 +255,43 @@ def test_location_verdicts_need_a_quote_from_the_description():
     assert tz["eligibility"] == "timezone_only"
 
 
+@pytest.mark.parametrize("evidence, expected", [
+    ("Location tag: US", "unclear"),
+    ("US work authorization is required.", "unclear"),
+    ("…", "unclear"),
+    ("Applicants must have the right to work in Canada.", "work_authorization_required"),
+])
+def test_authorization_verdict_requires_body_evidence(evidence, expected):
+    from scanner.eligibility import check_evidence
+
+    job = make_job(location="US", description="Applicants must have the right to work in Canada.")
+    result = check_evidence(job, {**BASE, "eligibility": "work_authorization_required",
+                                "eligibility_evidence": evidence})
+    assert result["eligibility"] == expected
+
+
+def test_audit_safeguards_reach_private_prompts_and_invalidate_cache(tmp_path, monkeypatch):
+    import hashlib
+    import json
+    import sqlite3
+
+    from scanner import eligibility
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    prompt = tmp_path / "eligibility.md"
+    prompt.write_text("Judge location only.")
+    db = sqlite3.connect(":memory:")
+    screener = eligibility.Screener({"chain": [{"provider": "gemini", "model": "test"}]}, prompt, db)
+    system = screener.clients[0].system
+    assert "No visa sponsorship or conditional export/security checks alone" in system
+    assert "A partial country list introduced by 'including'" in system
+    old_system = system.split("\n\n## Evidence safeguards")[0]
+    old_hash = hashlib.sha256((old_system + json.dumps(eligibility.BATCH_SCHEMA, sort_keys=True)).encode()).hexdigest()[:12]
+    db.execute("INSERT INTO llm_location VALUES (?, ?, ?, ?, ?)",
+               ("job", old_hash, "test", json.dumps(BASE), "2026-10-16"))
+    assert screener._cached(make_job(id="job")) is None
+
+
 def test_screener_runs_batches_in_threads_and_logs_calls(tmp_path, monkeypatch):
     """Regression: call logging used to touch sqlite from worker threads."""
     from scanner import eligibility

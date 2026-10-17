@@ -18,5 +18,5 @@ Highest priority first. Each item names its owner once picked up; agents work on
 | 12 | Check tier triage: 98 Check jobs/day is too many to read; rank Check by evidence strength and collapse low-signal ones | user time | Codex |
 | 13 | Weekly cron refreshes seed lists (`watchlist seeds`) before the rebuild | new companies arrive without manual runs | done 2026-10-17 |
 | 14 | Duplicate audit after adding 4 remote boards: same job via RemoteOK/WWR/Jobicy and the employer ATS must be reported once, with the ATS copy winning | boards re-post ATS jobs | open |
-| 15 | AI-decision audit: sample LLM eligibility verdicts and their quoted evidence from the decisions/llm_calls tables; measure wrong "eligible"/"locked" calls and fix prompts or rules | AI is the least predictable step | open |
+| 15 | AI-decision audit: sample LLM eligibility verdicts and their quoted evidence from the decisions/llm_calls tables; measure wrong "eligible"/"locked" calls and fix prompts or rules | AI is the least predictable step | done (branch) |
 | 16 | Daily run budget: measure end-to-end time with all sources; keep it under ~15 min (parallel fetch per source, cap detail fetches) | more sources = slower run | open |
