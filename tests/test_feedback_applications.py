@@ -109,3 +109,19 @@ def test_start_here_and_detail_marks_share_one_ref(tmp_path):
     sync(store, jobs)
     assert store.db.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] == 1
     assert store.db.execute("SELECT COUNT(*) FROM applications").fetchone()[0] == 1
+
+
+def test_learning_counts_cli_applications_and_changed_mark_date(tmp_path):
+    from scanner.learning_outcomes import section
+
+    store, _, ref = setup(tmp_path)
+    apps = Applications(store)
+    apps.set_status(ref, "applied", at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    lines, _ = section(store.db, "2026-01-01")
+    assert any("positive.worldwide | 1 | 0 | 0" in line for line in lines)
+    apps.feedback(ref, "good", "", datetime(2026, 1, 2, tzinfo=timezone.utc))
+    apps.feedback(ref, "not-eligible", "US only", datetime(2026, 1, 4, tzinfo=timezone.utc))
+    apps.feedback(ref, "not-eligible", "US only", datetime(2026, 1, 5, tzinfo=timezone.utc))
+    assert store.db.execute("SELECT created_at FROM feedback WHERE ref=?", (ref,)).fetchone()[0].startswith("2026-01-04")
+    _, suggestions = section(store.db, "2026-01-03")
+    assert any("not-eligible" in item for item in suggestions)

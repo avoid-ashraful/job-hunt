@@ -35,8 +35,11 @@ def section(db, since: str) -> tuple[list[str], list[str]]:
         WHERE f.created_at >= ? AND f.rowid=(SELECT MAX(f2.rowid) FROM feedback f2 WHERE f2.ref=f.ref)""",
                           (since,)).fetchall()
     per_rule = defaultdict(Counter)
+    for _, rule, _, _ in rows:
+        per_rule[rule or "unknown"]["applied"] += 1
     for label, rule in feedback:
-        per_rule[rule][label] += 1
+        if label != "applied":
+            per_rule[rule][label] += 1
     out += ["## Marks by decision rule", ""]
     out += _table(["rule", "applied", "not eligible", "not relevant", "good", "eligible"],
                   [[rule, c["applied"], c["not-eligible"], c["not-relevant"], c["good"], c["eligible"]]

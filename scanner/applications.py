@@ -45,7 +45,9 @@ class Applications:
         stamp = (at or datetime.now(timezone.utc)).isoformat()
         self.db.execute("""INSERT INTO feedback (created_at, ref, job_id, label, note, source)
             VALUES (?, ?, ?, ?, ?, 'report') ON CONFLICT(ref) WHERE source='report'
-            DO UPDATE SET label=excluded.label, note=excluded.note, job_id=excluded.job_id""",
+            DO UPDATE SET label=excluded.label, note=excluded.note, job_id=excluded.job_id,
+            created_at=CASE WHEN feedback.label != excluded.label OR COALESCE(feedback.note, '') != excluded.note
+                            THEN excluded.created_at ELSE feedback.created_at END""",
             (stamp, ref, job[0], label, note))
         if label == "applied" and not self.db.execute("SELECT 1 FROM applications WHERE ref=?", (ref,)).fetchone():
             self.set_status(ref, "applied", note, at=at)
