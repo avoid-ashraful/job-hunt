@@ -48,7 +48,8 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
         why = f" {_cell(why_text)} |" if with_why else ""
         lines.append(
             f"| `{job_ref(job.id)}` | {sc.get('fit', '')}/5 | {_cell(job.company)} | {_cell(job.title)} | {_cell(who)} | "
-            f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_salary(job)} | {seen} | [apply]({job.url}) |"
+            f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_salary(job)} | {seen} | "
+            f"[{('Himalayas apply' if job.source == 'himalayas' else 'apply')}]({job.url}) |"
         )
     return lines
 
