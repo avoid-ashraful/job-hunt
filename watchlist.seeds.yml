@@ -251,3 +251,8 @@ companies:
     board: safetywing
     hq_country: us
     why: 'Nomad-insurance company; "fully remote and distributed stretching ten timezones, while headquartered in San Francisco": https://safetywing.pinpointhq.com/'
+  - company: Kraken
+    website: https://kraken.com
+    ats: ashby
+    board: kraken.com
+    why: Crypto exchange (remoteintech, worldwide); the guessed board krakentech belongs to Kraken Technologies (Octopus Energy)
