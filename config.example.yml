@@ -123,7 +123,7 @@ filters:
   # the "role family" used when collapsing seniority within a company.
   role_families:
     python:     ['\bpython3?\b', '\bdjango\b', '\bfastapi\b']
-    backend:    ['back[\s-]?end', '\bapi\b', 'platform engineer', 'server[\s-]?side']
+    backend:    ['back[\s-]?end', '(?=.*\b(?:engineer|developer|programmer|architect)s?\b).*\bapi\b', 'platform engineer', 'server[\s-]?side']
     fullstack:  ['full[\s-]?stack']
     applied_ai: ['applied ai', '\b(ai|llm|gen(erative)?\s?ai|agentic( ai)?)\s+(software\s+)?(engineer|developer)\b', '\bai (platform|application|product|systems?|infrastructure) engineer\b', 'applied (ai|ml)\b', '\bai\s*/\s*ml\s+(software\s+)?(engineer|developer)\b', '\b(ml|ai|llm)\s+(platform|infrastructure|inference)\s+engineer\b']
     software:   ['software (engineer|developer|development engineer)', '\bswe\b', '\bsde\b']

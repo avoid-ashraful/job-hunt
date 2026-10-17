@@ -529,3 +529,16 @@
   expected:
     outcome: drop
     rule: title excluded
+- name: api-title-needs-a-role-noun
+  stage: filter
+  job:
+    title: SME – Meta Conversions API Professional Certificate - Advanced
+  expected:
+    outcome: drop
+- name: api-architect-kept
+  stage: filter
+  job:
+    title: API Architect
+  expected:
+    outcome: keep
+    family: backend
