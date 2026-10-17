@@ -174,6 +174,9 @@ def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, dro
             summaries.append(f"{source['name']} {status} ({source['seconds']:.0f}s)")
         lines.append("Sources: " + " · ".join(summaries) + "\n")
 
+    if stats.get("selftest_failed", 0):
+        lines.append(f"⚠ selftest: {stats['selftest_failed']} rule cases failed\n")
+
     with path.open("a") as fh:
         fh.write("\n".join(lines) + "\n")
 

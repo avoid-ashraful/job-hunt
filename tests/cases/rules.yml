@@ -1,0 +1,386 @@
+# Shared by pytest (example config) and scanner selftest (active config).
+- name: target_titles_kept-01
+  stage: filter
+  job:
+    title: Senior Backend Engineer
+  expected:
+    outcome: keep
+    family: backend
+- name: target_titles_kept-02
+  stage: filter
+  job:
+    title: Staff Software Engineer, Payments
+  expected:
+    outcome: keep
+    family: software
+- name: target_titles_kept-03
+  stage: filter
+  job:
+    title: Senior Python Developer
+  expected:
+    outcome: keep
+    family: python
+- name: target_titles_kept-04
+  stage: filter
+  job:
+    title: Lead Full-Stack Engineer
+  expected:
+    outcome: keep
+    family: fullstack
+- name: target_titles_kept-05
+  stage: filter
+  job:
+    title: Applied AI Engineer
+  expected:
+    outcome: keep
+    family: applied_ai
+- name: target_titles_kept-06
+  stage: filter
+  job:
+    title: Senior Engineer
+  expected:
+    outcome: keep
+    family: generic
+- name: non_target_titles_dropped-01
+  stage: filter
+  job:
+    title: Junior Backend Engineer
+  expected:
+    outcome: drop
+- name: non_target_titles_dropped-02
+  stage: filter
+  job:
+    title: Senior Frontend Engineer
+  expected:
+    outcome: drop
+- name: non_target_titles_dropped-03
+  stage: filter
+  job:
+    title: Engineering Manager, Backend
+  expected:
+    outcome: drop
+- name: non_target_titles_dropped-04
+  stage: filter
+  job:
+    title: Senior DevOps Engineer
+  expected:
+    outcome: drop
+- name: non_target_titles_dropped-05
+  stage: filter
+  job:
+    title: Backend Intern
+  expected:
+    outcome: drop
+- name: non_target_titles_dropped-06
+  stage: filter
+  job:
+    title: AI Trainer - Python
+  expected:
+    outcome: drop
+- name: non_target_titles_dropped-07
+  stage: filter
+  job:
+    title: Senior Backend Engineer (Go)
+  expected:
+    outcome: drop
+- name: non_target_titles_dropped-08
+  stage: filter
+  job:
+    title: Staff Product Designer
+  expected:
+    outcome: drop
+- name: hard_drops-01
+  stage: filter
+  job:
+    description: Python. Candidates must be authorized to work in the United States.
+  expected:
+    outcome: drop
+- name: hard_drops-02
+  stage: filter
+  job:
+    description: Python. This role requires an active Secret clearance.
+  expected:
+    outcome: drop
+- name: hard_drops-03
+  stage: filter
+  job:
+    description: Python. This is a W2 only position.
+  expected:
+    outcome: drop
+- name: hard_drops-04
+  stage: filter
+  job:
+    description: Python. Must be a U.S. citizen.
+  expected:
+    outcome: drop
+- name: location_rules-01
+  stage: location
+  job:
+    description: You must be located in the United States.
+  expected:
+    outcome: locked
+- name: location_rules-02
+  stage: location
+  job:
+    description: This role is remote within Canada.
+  expected:
+    outcome: locked
+- name: location_rules-03
+  stage: location
+  job:
+    description: 'We can only hire in the following countries: US, UK, Germany.'
+  expected:
+    outcome: locked
+- name: location_rules-04
+  stage: location
+  job:
+    description: This role can be worked remotely from anywhere in the UK only.
+  expected:
+    outcome: locked
+- name: location_rules-05
+  stage: location
+  job:
+    description: The role is based in Europe.
+  expected:
+    outcome: locked
+- name: location_rules-06
+  stage: location
+  job:
+    description: Удаленная работа на территории РФ.
+  expected:
+    outcome: locked
+- name: location_rules-07
+  stage: location
+  job:
+    description: Work from anywhere in the world. We are async-first.
+  expected:
+    outcome: positive
+- name: location_rules-08
+  stage: location
+  job:
+    description: Remote (Worldwide)
+  expected:
+    outcome: positive
+- name: location_rules-09
+  stage: location
+  job:
+    description: Candidates must be located in Europe or Asia.
+  expected:
+    outcome: positive
+- name: location_rules-10
+  stage: location
+  job:
+    description: We are hiring in Bangladesh, India and Pakistan.
+  expected:
+    outcome: positive
+- name: location_rules-11
+  stage: location
+  job:
+    description: You need at least 4 hours of overlap with EST.
+  expected:
+    outcome: timezone
+- name: location_rules-12
+  stage: location
+  job:
+    description: We build developer tools. You will write Python.
+  expected:
+    outcome: silent
+- name: location_rules-13
+  stage: location
+  job:
+    description: We hire through Deel.
+  expected:
+    outcome: ambiguous
+- name: location_rules-14
+  stage: location
+  job:
+    description: 'Location: Europe'
+  expected:
+    outcome: ambiguous
+- name: location_rules-15
+  stage: location
+  job:
+    description: Must be located in the US. Work from anywhere in the world!
+  expected:
+    outcome: ambiguous
+- name: location_rules-16
+  stage: location
+  job:
+    description: '* Work anywhere in the world for up to 3 months!'
+  expected:
+    outcome: silent
+- name: location_rules-17
+  stage: location
+  job:
+    description: We can hire people in any country where we have a legal entity.
+  expected:
+    outcome: ambiguous
+- name: location_rules-18
+  stage: location
+  job:
+    description: We do not administer lie detector tests to applicants in any location.
+  expected:
+    outcome: silent
+- name: location_rules-19
+  stage: location
+  job:
+    description: 'Location: can be based anywhere in Europe / EU Timezone'
+  expected:
+    outcome: locked
+- name: location_rules-20
+  stage: location
+  job:
+    description: This role is remote (Europe or USA) with overlap with EST timezone.
+  expected:
+    outcome: ambiguous
+- name: location_rules-21
+  stage: location
+  job:
+    description: 'Remote-first and flexible: work from anywhere, at your own pace.'
+  expected:
+    outcome: ambiguous
+- name: location_rules-22
+  stage: location
+  job:
+    description: We're a fully remote, globally distributed team.
+  expected:
+    outcome: ambiguous
+- name: location_rules-23
+  stage: location
+  job:
+    description: You must be located in a US time zone.
+  expected:
+    outcome: timezone
+- name: location_rules-24
+  stage: location
+  job:
+    description: Candidates must reside in the Eastern or Central time zone.
+  expected:
+    outcome: locked
+- name: gig_and_non_engineering_titles_dropped-01
+  stage: filter
+  job:
+    title: Software Engineer (GitHub Contributor)
+  expected:
+    outcome: drop
+- name: gig_and_non_engineering_titles_dropped-02
+  stage: filter
+  job:
+    title: Senior Software Engineer | AI Evaluation
+  expected:
+    outcome: drop
+- name: gig_and_non_engineering_titles_dropped-03
+  stage: filter
+  job:
+    title: Marketing Specialist (Backend & Digital Ads)
+  expected:
+    outcome: drop
+- name: gig_and_non_engineering_titles_dropped-04
+  stage: filter
+  job:
+    title: Open Application - Backend Engineer
+  expected:
+    outcome: drop
+- name: gig_and_non_engineering_titles_dropped-05
+  stage: filter
+  job:
+    title: Senior Back-End Developer (RPG / IBM i)
+  expected:
+    outcome: drop
+- name: mid-level-title
+  stage: filter
+  job:
+    title: Backend Engineer II
+  expected:
+    outcome: keep
+- name: generic-work-authorization
+  stage: filter
+  job:
+    description: Python. You must be authorized to work in the country where you reside.
+  expected:
+    outcome: keep
+- name: other-language-stack
+  stage: filter
+  job:
+    description: Our services are written in Golang on Kubernetes.
+  expected:
+    outcome: drop
+    rule: no Python
+- name: language-agnostic-stack
+  stage: filter
+  job:
+    description: We care about fundamentals, not languages.
+  expected:
+    outcome: keep
+- name: ai-lab-gig
+  stage: filter
+  job:
+    description: Python experts to work with a leading AI lab. Task-based compensation, 100 openings.
+  expected:
+    outcome: drop
+    rule: ai_gig
+- name: perk-is-not-eligibility
+  stage: location
+  job:
+    description: You must be based in the UK. Work remotely anywhere in the world for up to 1 month per
+      year.
+  expected:
+    outcome: locked
+- name: generic-place
+  stage: location
+  job:
+    description: You must be based in a quiet place.
+  expected:
+    outcome: silent
+- name: us-abbreviation
+  stage: location
+  job:
+    description: Candidates must reside in the U.S. and work EST hours.
+  expected:
+    outcome: locked
+- name: watchlist-global-location
+  stage: location
+  job:
+    description: Build Python APIs.
+    location: Remote, Global
+    watchlist: true
+  expected:
+    outcome: positive
+    rule: positive.ats_location_global
+- name: agency-client
+  stage: role
+  job:
+    description: We are hiring for our client, a fintech.
+  expected:
+    outcome: drop
+    rule: agency.for_our_client
+- name: german-posting
+  stage: role
+  job:
+    description: Python dev
+    posting_language: de
+  expected:
+    outcome: drop
+    rule: language.de
+- name: german-posting-english-required
+  stage: role
+  job:
+    description: Fluent English required. Python.
+    posting_language: de
+  expected:
+    outcome: keep
+- name: frontend-heavy-fullstack
+  stage: role
+  job:
+    title: Lead Full-Stack Engineer
+    description: React React React CSS HTML Figma UI UX Tailwind frontend. Some API.
+  expected:
+    outcome: drop
+    rule: role.frontend_heavy
+- name: python-stack-fit
+  stage: fit
+  job:
+    title: Senior Python Engineer
+    description: Python, Django, Celery, Postgres, Redis, AWS, Docker
+  expected:
+    outcome: 5
