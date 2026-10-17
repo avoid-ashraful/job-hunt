@@ -12,6 +12,8 @@ The scanner is built to be tuned from data, not guesswork. Every run records:
 
 Plus `private/state/dropped/<date>.tsv` (every dropped job with its reason) and `private/state/logs/<date>.log`.
 
+`filters.max_age_days_live` (45 by default) lets non-watchlist ATS jobs older than `max_age_days` (21) but below that cap proceed only with a confirmed-open liveness check; ghost rules still apply.
+
 ## Giving feedback (takes seconds, makes the biggest difference)
 
 Each job has a **Mark** cell in the daily Markdown file. Open `private/jobs/YYYY-MM-DD.md` on a phone or laptop and replace `[ ]` with one letter. An optional note goes after a space, inside the brackets.

@@ -2,7 +2,7 @@
 
 Only a clear answer counts: a 404/410 from the ATS API (or the posting page itself), or
 the job missing from a non-empty Ashby board. Timeouts, rate limits and server errors
-are "unknown" and the job is kept.
+are "unknown" and the job is kept unless its age requires confirmation.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from functools import lru_cache
 import requests
 
 from scanner.models import Job
+from scanner.sources._public import ats_id
 
 log = logging.getLogger(__name__)
 OPEN, CLOSED, UNKNOWN = "open", "closed", "unknown"
@@ -40,9 +41,22 @@ def _ashby_board(board: str) -> frozenset[str] | None:
     return frozenset(j["id"] for j in jobs) if jobs else None  # an empty board is inconclusive
 
 
-def check(job: Job) -> str:
+def _ats_identity(job: Job) -> tuple[str, str, str] | None:
     ats, _, rest = job.id.partition(":")
     board, _, ext = rest.partition(":")
+    if ats in {"greenhouse", "lever", "ashby", "workable", "smartrecruiters"} and board and ext:
+        return ats, board, ext
+    if identity := ats_id(job.url, job.company):
+        return tuple(identity.split(":", 2))
+    return None
+
+
+def can_verify(job: Job) -> bool:
+    return _ats_identity(job) is not None
+
+
+def check(job: Job) -> str:
+    ats, board, ext = _ats_identity(job) or ("", "", "")
     if ats == "greenhouse" and board and ext:
         return _status(f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{ext}")
     if ats == "lever" and board and ext:

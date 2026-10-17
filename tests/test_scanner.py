@@ -102,7 +102,7 @@ def test_country_suffix_is_same_job():
 
 def test_excluded_company_and_age_and_salary(filters):
     assert filters.evaluate(make_job(company="Globex", company_key="globex")).startswith("excluded company")
-    assert filters.evaluate(make_job(first_seen_at=NOW - timedelta(days=30))).startswith("older than")
+    assert filters.evaluate(make_job(first_seen_at=NOW - timedelta(days=50))).startswith("older than")
     low = make_job(salary_max=80_000, salary_currency="USD", salary_period="year")
     assert filters.evaluate(low).startswith("salary max")
     hourly = make_job(salary_max=70, salary_currency="USD", salary_period="hour")
@@ -110,7 +110,7 @@ def test_excluded_company_and_age_and_salary(filters):
 
 
 def test_restated_posted_date_does_not_make_job_fresh(filters):
-    job = make_job(posted_at=NOW, first_seen_at=NOW - timedelta(days=40))
+    job = make_job(posted_at=NOW, first_seen_at=NOW - timedelta(days=50))
     assert filters.evaluate(job).startswith("older than")
 
 
