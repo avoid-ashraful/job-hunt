@@ -58,6 +58,7 @@ BATCH_NOTE = (
     "\n\n## Batch format\nYou will receive several postings, each starting with `### JOB <ref>`, followed by "
     "its title, tags and the sentences from its description that mention location. Judge each one "
     "independently and return one entry per posting in `results`, with `job_ref` set to its ref."
+    " Snippets include eligibility requirements and location lists as well as geographic sentences."
     "\n\n## Evidence safeguards\n"
     "A bare 'work from anywhere' perk is unclear unless the text establishes worldwide hiring. "
     "Existing employees' locations and optional office locations do not establish hiring restrictions. "
