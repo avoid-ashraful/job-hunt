@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS llm_location (
     model TEXT NOT NULL,
     result TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    content_hash TEXT,
     PRIMARY KEY (job_id, prompt_hash)
 );
 """
@@ -268,22 +269,53 @@ class Screener:
             raise RuntimeError("no usable LLM in llm.chain (missing GEMINI_API_KEY?)")
         self.db = db
         self.db.executescript(CACHE_SCHEMA)
+        cols = {row[1] for row in self.db.execute("PRAGMA table_info(llm_location)")}
+        if "content_hash" not in cols:
+            self.db.execute("ALTER TABLE llm_location ADD COLUMN content_hash TEXT")
         self.calls = 0
 
-    def _cached(self, job: Job) -> dict | None:
-        row = self.db.execute(
-            "SELECT result FROM llm_location WHERE job_id = ? AND prompt_hash = ?", (job.id, self.prompt_hash)
-        ).fetchone()
-        return json.loads(row[0]) if row else None
-
     @staticmethod
-    def _job_text(ref: str, job: Job, snippets: list[str]) -> str:
+    def _content_text(job: Job, snippets: list[str]) -> str:
         body = "\n".join(f"- {s}" for s in snippets) or "- (no sentence in the description mentions location)"
         return (
-            f"### JOB {ref}\nTitle: {job.title}\nCompany: {job.company}\n"
+            f"Title: {job.title}\nCompany: {job.company}\n"
             f"Location tag: {job.location or '-'}\nRegion tags: {', '.join(job.regions) or '-'}\n"
             f"Location sentences from the description:\n{body}\n"
         )
+
+    @classmethod
+    def content_hash(cls, job: Job, snippets: list[str]) -> str:
+        return hashlib.sha256(cls._content_text(job, snippets).encode()).hexdigest()[:12]
+
+    @classmethod
+    def _job_text(cls, ref: str, job: Job, snippets: list[str]) -> str:
+        return f"### JOB {ref}\n" + cls._content_text(job, snippets)
+
+    def _cached(self, job: Job, snippets: list[str] | None = None) -> dict | None:
+        row = self.db.execute(
+            "SELECT result, content_hash FROM llm_location WHERE job_id = ? AND prompt_hash = ?",
+            (job.id, self.prompt_hash),
+        ).fetchone()
+        if not row:
+            return None
+        result_json, cached_hash = row[0], row[1]
+        if snippets is None:
+            snippets = job.screen.get("snippets")
+        if snippets is not None:
+            current_hash = self.content_hash(job, snippets)
+            if cached_hash is None:
+                # Store hash on first read-hit to avoid an LLM quota burst on legacy rows, missing only on later changes.
+                self.db.execute(
+                    "UPDATE llm_location SET content_hash = ? WHERE job_id = ? AND prompt_hash = ?",
+                    (current_hash, job.id, self.prompt_hash),
+                )
+                self.db.commit()
+                return json.loads(result_json)
+            if cached_hash != current_hash:
+                return None
+        elif cached_hash is not None:
+            return None
+        return json.loads(result_json)
 
     def _batch(self, batch: list[tuple[Job, list[str]]], purpose: str) -> tuple[dict[str, dict], str]:
         refs = {f"J{i + 1}": item for i, item in enumerate(batch)}
@@ -320,7 +352,7 @@ class Screener:
         results: dict[str, tuple[dict, str]] = {}
         todo = []
         for job, snippets in items:
-            if (cached := self._cached(job)) is not None:
+            if (cached := self._cached(job, snippets)) is not None:
                 results[job.id] = (cached, "cache")
             else:
                 todo.append((job, snippets))
@@ -337,10 +369,14 @@ class Screener:
                     log.error("llm %s: batch failed: %s", purpose, exc)
                     continue
                 now = datetime.now(timezone.utc).isoformat()
+                batch_hashes = {job.id: self.content_hash(job, snippets) for job, snippets in futures[fut]}
                 for job_id, result in out.items():
                     results[job_id] = (result, model)
-                    self.db.execute("INSERT OR REPLACE INTO llm_location VALUES (?, ?, ?, ?, ?)",
-                                    (job_id, self.prompt_hash, model, json.dumps(result), now))
+                    self.db.execute(
+                        "INSERT OR REPLACE INTO llm_location (job_id, prompt_hash, model, result, created_at, content_hash) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        (job_id, self.prompt_hash, model, json.dumps(result), now, batch_hashes.get(job_id)),
+                    )
                 self.db.commit()
         self._flush_calls()
         return results

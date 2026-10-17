@@ -122,6 +122,7 @@ def test_extraction_update_invalidates_cached_verdicts(tmp_path, monkeypatch):
     import sqlite3
 
     from scanner.eligibility import BATCH_SCHEMA, Screener
+    from scanner.models import Job
 
     monkeypatch.setenv("GEMINI_API_KEY", "test")
     prompt = tmp_path / "prompt.md"
@@ -133,7 +134,7 @@ def test_extraction_update_invalidates_cached_verdicts(tmp_path, monkeypatch):
     )
     old_hash = hashlib.sha256((old_system + json.dumps(BATCH_SCHEMA, sort_keys=True)).encode()).hexdigest()[:12]
     assert old_hash != screener.prompt_hash
-    db.execute("INSERT INTO llm_location VALUES (?, ?, ?, ?, ?)",
+    db.execute("INSERT INTO llm_location (job_id, prompt_hash, model, result, created_at) VALUES (?, ?, ?, ?, ?)",
                ("test:1", old_hash, "test", '{}', "2026-10-17"))
     job = Job(id="test:1", source="test", url="https://example.com/job", title="Engineer",
               company="Example", company_key="example", description="US work authorization required.")
