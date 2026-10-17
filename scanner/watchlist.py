@@ -11,6 +11,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from urllib.parse import quote, urljoin, urlparse
 
 import requests
@@ -68,7 +69,14 @@ def _read(path: Path) -> list[dict]:
 def _write(path: Path, companies: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     ordered = sorted(companies, key=lambda c: normalize_company(c["company"]))
-    path.write_text(yaml.safe_dump({"companies": ordered}, sort_keys=False, allow_unicode=True))
+    contents = yaml.safe_dump({"companies": ordered}, sort_keys=False, allow_unicode=True)
+    with NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", delete=False) as handle:
+        temporary = Path(handle.name)
+    try:
+        temporary.write_text(contents)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _company_file(path: Path) -> dict | None:

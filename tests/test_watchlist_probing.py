@@ -5,6 +5,7 @@ import subprocess
 import sys
 from datetime import date
 from email.utils import formatdate
+from pathlib import Path
 
 import pytest
 import requests
@@ -77,6 +78,23 @@ def test_workable_markdown_detail_honors_a_quota_block(clock):
         ats._record(raw, {"company": "Acme", "ats": "workable", "board": "acme"}, {}, session)
     assert err.value.response.status_code == 429
     assert session.calls == []
+
+
+def test_interrupted_watchlist_save_preserves_the_previous_file(tmp_path, monkeypatch):
+    path = tmp_path / "watchlist.yml"
+    original = [{"company": "Acme", "ats": "lever", "board": "acme"}]
+    watchlist._write(path, original)
+    before = path.read_bytes()
+
+    def partial_write(target, contents, *args, **kwargs):
+        target.write_bytes(contents[:10].encode())
+        raise OSError("disk full during save")
+
+    monkeypatch.setattr(Path, "write_text", partial_write)
+    with pytest.raises(OSError, match="disk full"):
+        watchlist._write(path, original + [{"company": "New", "ats": "ashby", "board": "new"}])
+    assert path.read_bytes() == before
+    assert list(tmp_path.iterdir()) == [path]
 
 
 @pytest.mark.parametrize("getter", [ats.get, ats.get_text])
