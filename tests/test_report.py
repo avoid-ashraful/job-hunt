@@ -36,8 +36,10 @@ def test_check_score_evidence_ordering():
                 replace(base, screen={**base.screen, "preferred_hq": True}),
                 replace(base, screen={**base.screen, "eligibility": "timezone_only"}),
                 replace(base, screen={**base.screen, "fit": 5}),
-                replace(base, screen={**base.screen, "pay_hint": "$100k"})]
-    assert [check_score(j) - check_score(base) for j in stronger] == [8, 4, 4, 6, 6, 4, 3, 2, 2]
+                replace(base, screen={**base.screen, "pay_hint": "$100k"}),
+                replace(base, description="Python. We hire anywhere via Deel."),
+                replace(base, description="Python. You will join as an independent contractor.")]
+    assert [check_score(j) - check_score(base) for j in stronger] == [8, 4, 4, 6, 6, 4, 3, 2, 2, 4, 4]
     unknown = replace(base, screen={**base.screen, "hq_country": ""})
     ghost = replace(base, screen={**base.screen, "ghost": (2, ["scraped_repost"])})
     aggregator = replace(base, screen={**base.screen, "ghost": (2, ["aggregator_source (whatjobs)"])})

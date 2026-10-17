@@ -40,9 +40,14 @@ def _sort_key(job: Job):
             -(job.age_anchor.timestamp() if job.age_anchor else 0))
 
 
+# Hiring through an employer of record or as a contractor is how someone abroad gets hired.
+EOR = re.compile(r"\b(?:deel|remote\.com|oyster(?:hr)?|employer of record|employee of record|\beor\b|"
+                 r"(?:as an? |independent )contractors?\b)", re.I)
+
+
 def check_score(job: Job) -> int:
     """Evidence priority: +8 watchlist, +6 confirmed eligibility, +4 ATS link,
-    +4 preferred HQ, +3 timezone-only, +fit (0–5), +2 known pay;
+    +4 preferred HQ, +4 hires via EOR/contractor, +3 timezone-only, +fit (0–5), +2 known pay;
     -8 ghost signal, -3 unknown HQ, -3 aggregator-only ghost signal.
     """
     sc = job.screen or {}
@@ -54,6 +59,7 @@ def check_score(job: Job) -> int:
     pay = bool(sc.get("pay_hint") or _salary(job))
     return (8 * job.watchlist + 6 * positive + 4 * ats
             + 4 * bool(sc.get("preferred_hq"))
+            + 4 * bool(EOR.search(job.description or ""))
             + 3 * (sc.get("eligibility") == "timezone_only")
             + sc.get("fit", 0) + 2 * pay
             - 8 * bool(ghost_score) - 3 * (not sc.get("hq_country"))
