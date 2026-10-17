@@ -178,6 +178,7 @@ filters:
     - '\b(embedded|firmware|hardware)\b'
     - '\b(salesforce|servicenow|sap|dynamics)\b'
     - '\b(designer|sales|marketing|solutions? engineer|support engineer|customer)\b'
+    - '\b(developer relations|devrel|developer advocate|(developer|customer) success)\b'
     - '\b(junior|jr\.?|intern|internship|graduate|new grad|entry[\s-]level|apprentice|trainee)\b'
     - '\bassociate (software )?(engineer|developer)\b'
     - '\b(manager|director|head of|vp|vice president)\b'

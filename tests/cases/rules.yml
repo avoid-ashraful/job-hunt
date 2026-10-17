@@ -542,3 +542,15 @@
   expected:
     outcome: keep
     family: backend
+- name: devrel-is-not-a-target-role
+  stage: filter
+  job:
+    title: Developer Relations Engineer (London, UK)
+  expected:
+    outcome: drop
+- name: developer-success-is-not-a-target-role
+  stage: filter
+  job:
+    title: Senior Developer Success Engineer - West
+  expected:
+    outcome: drop
