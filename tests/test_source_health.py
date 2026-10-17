@@ -13,6 +13,7 @@ from scanner.store import Store
 
 def test_run_records_source_health(tmp_path, monkeypatch, caplog):
     cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
+    cfg["run"] = {"fetch_workers": 1}
     cfg["sources"] = {"broken": {"enabled": True}, "freehire": {"enabled": True},
                       "empty": {"enabled": True}, "disabled": {"enabled": False}}
     cfg["output"] = {"jobs_dir": "jobs", "state_dir": "state"}
@@ -82,3 +83,77 @@ def test_store_migrates_run_source_stats(tmp_path):
     assert store.db.execute("SELECT source_stats FROM runs").fetchone() == ("[]",)
     store.log_run("new run", 0, 0, 0, 0, "report.md", 0)
     assert store.db.execute("SELECT source_stats FROM runs WHERE run_at='new run'").fetchone() == ("[]",)
+
+
+def test_concurrent_fetch_keeps_config_priority(monkeypatch):
+    from threading import Event
+
+    second_finished = Event()
+    first = Job(id="same", source="first", url="https://example.com", company="Example",
+                company_key="example", title="First", description="")
+    second = Job(id="same", source="second", url="https://example.com", company="Example",
+                 company_key="example", title="Second", description="Filled description", skills=["python"])
+
+    def fetch_first(cfg, days):
+        assert second_finished.wait(5), "sources did not run concurrently"
+        yield first
+        raise RuntimeError("partial result")
+
+    def fetch_second(cfg, days):
+        second_finished.set()
+        yield second
+
+    modules = {"first": SimpleNamespace(fetch=fetch_first), "second": SimpleNamespace(fetch=fetch_second)}
+    monkeypatch.setattr(sources.importlib, "import_module", lambda name: modules[name.rsplit(".", 1)[1]])
+    stats = []
+    jobs = list(sources.fetch_all({name: {"enabled": True} for name in modules}, 1, stats, workers=2))
+    assert jobs == [first, second]
+    assert [row["name"] for row in stats] == ["first", "second"]
+    assert stats[0]["count"] == 1
+    assert stats[0]["error"] == "RuntimeError: partial result"
+    fetched = {}
+    for job in jobs:
+        if job.id in fetched:
+            cli._fill_missing(fetched[job.id], job)
+        else:
+            fetched[job.id] = job
+    assert fetched["same"].title == "First"
+    assert fetched["same"].source == "first"
+    assert fetched["same"].skills == ["python"]
+
+
+def test_fetch_budget_skips_queued_sources_after_active_source_finishes(monkeypatch):
+    clock = [0]
+    calls = []
+    monkeypatch.setattr(sources.time, "monotonic", lambda: clock[0])
+
+    def fetch(cfg, days):
+        calls.append("active")
+        clock[0] = 61
+        return iter([])
+
+    monkeypatch.setattr(sources.importlib, "import_module", lambda name: SimpleNamespace(fetch=fetch))
+    stats = []
+    assert list(sources.fetch_all({name: {"enabled": True} for name in ("active", "queued")},
+                                  1, stats, budget_minutes=1, workers=1)) == []
+    assert calls == ["active"]
+    assert stats[0]["error"] is None
+    assert stats[1] == {"name": "queued", "count": 0, "seconds": 0,
+                        "error": "skipped: fetch budget exceeded"}
+
+
+def test_run_budget_warning_in_source_footer(tmp_path, monkeypatch):
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
+    cfg["sources"] = {"freehire": {"enabled": True}}
+    cfg["run"] = {"fetch_budget_minutes": 0}
+    cfg["output"] = {"jobs_dir": "jobs", "state_dir": "state"}
+    config = tmp_path / "config.yml"
+    config.write_text(yaml.safe_dump(cfg))
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+
+    def unexpected_import(name):
+        raise AssertionError("budget-exhausted sources must not be imported")
+
+    monkeypatch.setattr(sources.importlib, "import_module", unexpected_import)
+    report = cli.run(config, dry_run=False, days=1, skip_llm=True)
+    assert "freehire failed: skipped: fetch budget exceeded ⚠ (0s)" in report.read_text()
