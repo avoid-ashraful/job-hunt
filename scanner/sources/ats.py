@@ -459,7 +459,9 @@ def _record(raw: dict, company: dict, cfg: dict, session: requests.Session) -> J
         except Exception:
             pass
 
-    desc = plain(desc) if "<" in str(desc) else str(desc).strip()
+    # Greenhouse can return entity-escaped markup rather than literal tags.
+    desc = unescape(str(desc))
+    desc = plain(desc) if "<" in desc else desc.strip()
     url = raw.get("absolute_url") or raw.get("hostedUrl") or raw.get("jobUrl") or raw.get("applyUrl") or raw.get("url") or raw.get("shortlink") or raw.get("applicationUrl") or raw.get("careers_url")
     if not url:
         if ats == "smartrecruiters":

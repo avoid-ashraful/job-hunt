@@ -188,3 +188,13 @@ def test_freehire_workday_ids_are_usable():
 def test_freehire_board_forms_are_normalized(job_id, expected):
     from scanner import watchlist
     assert watchlist._ats_from_id(job_id) == expected
+
+
+def test_greenhouse_escaped_html_is_decoded():
+    import requests
+    from scanner.sources import ats
+
+    raw = {"id": 1, "title": "Senior Backend Engineer", "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/1",
+           "content": "&lt;p&gt;We hire &lt;strong&gt;worldwide&lt;/strong&gt;.&lt;/p&gt;", "location": {"name": "Remote"}}
+    job = ats._record(raw, {"ats": "greenhouse", "board": "acme", "company": "Acme"}, {}, requests.Session())
+    assert "<" not in job.description and "&lt;" not in job.description and "worldwide" in job.description
