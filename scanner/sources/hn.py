@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 import time
 from collections.abc import Iterator
@@ -36,8 +37,12 @@ def _comment_job(raw: dict, cfg: dict) -> Job | None:
     if not lines:
         return None
     head = lines[0]
-    fields = [x.strip() for x in re.split(r"\s*[|•]\s*", head) if x.strip()]
-    company = fields[0][:100]
+    # headers without a pipe: "Acme - we are hiring", "Acme — Role", "Acme is hiring"
+    piped = bool(re.search(r"[|•·]", head))
+    sep = r"\s*[|•·]\s*" if piped else r"\s+[—–-]\s+|\s+is hiring\b"
+    fields = [x.strip() for x in re.split(sep, head) if x.strip()]
+    # "Acme (https://acme.com)" / "Acme (YC S23, acme.com)" / "Acme (Remote US)": keep the name only
+    company = re.sub(r"\s*\([^)]*(?:\.\w{2,}|\bYC\b|\bremote\b)[^)]*\)", "", fields[0], flags=re.I).strip()[:100]
     if re.search(cfg["role_pattern"], company, re.I) or len(company) > 70:
         return None
     role = next((x for x in fields[1:] if re.search(cfg["role_pattern"], x, re.I)), "")
@@ -46,10 +51,14 @@ def _comment_job(raw: dict, cfg: dict) -> Job | None:
         role = match.group(0) if match else ""
     if not role or not company:
         return None
-    links = re.findall(r"https?://[^\s<>\])]+", raw.get("comment_text") or "")
+    # Algolia HTML escapes slashes (https:&#x2F;&#x2F;) and truncates link text, so read the hrefs
+    links = [html.unescape(x) for x in re.findall(r'href="([^"]+)"', raw.get("comment_text") or "")]
     target = next((x for x in links if ats_id(x, company)), "")
     comment_url = f"https://news.ycombinator.com/item?id={raw['objectID']}"
-    worldwide = bool(re.search(cfg["worldwide_pattern"], text, re.I))
+    where = next((x for x in fields[1:] if piped and x != role and re.search(cfg["remote_pattern"], x, re.I)), "")
+    # worldwide only in a sentence that is also about remote work, not "customers worldwide"
+    worldwide = any(re.search(cfg["remote_pattern"], x, re.I) and re.search(cfg["worldwide_pattern"], x, re.I)
+                    for x in re.split(r"(?<=[.!?])\s+|\n", text))
     posted = date(raw.get("created_at"))
     return Job(
         id=ats_id(target, company) if target else f"hn::{raw['objectID']}",
@@ -59,7 +68,7 @@ def _comment_job(raw: dict, cfg: dict) -> Job | None:
         company=company,
         company_key=normalize_company(company),
         description=text,
-        location="Remote worldwide" if worldwide else "Remote",
+        location="Remote worldwide" if worldwide else where[:80] or "Remote",
         regions=["global"] if worldwide else [],
         posted_at=posted,
         first_seen_at=posted,
