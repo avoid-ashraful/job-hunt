@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from scanner.dedup import seniority_level
 from scanner.models import Job
+from scanner.pay_market import local_only
 
 
 def _rx(patterns: list[str]) -> list[re.Pattern]:
@@ -21,8 +22,10 @@ def _first(patterns: list[re.Pattern], text: str) -> re.Match | None:
 
 
 class Filters:
-    def __init__(self, cfg: dict, seniority_rank: dict[str, int], now: datetime):
+    def __init__(self, cfg: dict, seniority_rank: dict[str, int], now: datetime, profiles=None):
         self.now = now
+        self.profiles = profiles
+        self.market = cfg.get("company_market", {})
         self.max_age = timedelta(days=cfg["max_age_days"])
         self.stale_after = timedelta(days=cfg.get("not_seen_live_days", 10))
         self.families = {name: _rx(pats) for name, pats in cfg["role_families"].items()}
@@ -56,6 +59,7 @@ class Filters:
     def evaluate(self, job: Job) -> str | None:
         """Annotate the job (family, rank, tags) and return a drop reason or None."""
         for check in (
+            self._market,
             self._company,
             self._age,
             self._title,
@@ -69,6 +73,14 @@ class Filters:
             if reason := check(job):
                 return reason
         self._tag(job)
+        return None
+
+    def _market(self, job: Job) -> str | None:
+        country, _ = self.profiles.resolve(job) if self.profiles else (None, "")
+        if country in set(self.market.get("deny_hq_countries", ["in", "bd"])):
+            return f"company based in {country.upper()}"
+        if self.market.get("drop_local_only_locations", True) and local_only(job):
+            return "location only in India/Bangladesh"
         return None
 
     def _company(self, job: Job) -> str | None:

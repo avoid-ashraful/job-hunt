@@ -18,6 +18,8 @@ class Job:
     location: str = ""
     regions: list[str] = field(default_factory=list)
     countries: list[str] = field(default_factory=list)
+    cities: list[str] = field(default_factory=list)
+    ats_metadata: dict = field(default_factory=dict)
     skills: list[str] = field(default_factory=list)
     posted_at: datetime | None = None
     first_seen_at: datetime | None = None  # when the source first recorded it

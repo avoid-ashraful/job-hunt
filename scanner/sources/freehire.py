@@ -49,6 +49,7 @@ def to_job(raw: dict) -> Job:
         location=raw.get("location") or "",
         regions=raw.get("regions") or [],
         countries=raw.get("countries") or [],
+        cities=raw.get("cities") or [],
         skills=raw.get("skills") or [],
         posted_at=_dt(raw.get("posted_at")),
         first_seen_at=_dt(raw.get("created_at")),
