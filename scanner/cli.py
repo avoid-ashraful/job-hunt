@@ -335,7 +335,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         with tempfile.TemporaryDirectory() as temp_dir:
             preview = Path(temp_dir) / "preview.md"
             write_report(preview, local_now, kept, stats, drop_counts, cfg["candidate"]["country"],
-                         cfg.get("report", {}).get("start_here_limit", 15))
+                         cfg.get("report", {}).get("start_here_limit", 15),
+                         cfg.get("report", {}).get("check_top", 25))
             print("\n".join(preview.read_text().splitlines()[:35]))
         return None
 
@@ -343,7 +344,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     jobs_dir.mkdir(parents=True, exist_ok=True)
     report = jobs_dir / f"{today}.md"
     write_report(report, local_now, kept, stats, drop_counts, cfg["candidate"]["country"],
-                 cfg.get("report", {}).get("start_here_limit", 15))
+                 cfg.get("report", {}).get("start_here_limit", 15),
+                 cfg.get("report", {}).get("check_top", 25))
     write_drop_log(ROOT / cfg["output"]["state_dir"] / "dropped" / f"{today}.tsv", dropped)
     for job in kept:
         store.mark_reported(job, today)

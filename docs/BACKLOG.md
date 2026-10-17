@@ -15,4 +15,4 @@ Highest priority first. Each item names its owner once picked up; agents work on
 | 9 | HQ coverage: measure how many reported jobs have unknown HQ; fill from ATS board metadata / company website footer, cached per company | unknown HQ can't be ranked by pay market | open |
 | 10 | Salary parsing from description text (ranges, currency, period) so pay-ranked sorting works when the source has no salary field | user wants well-paid roles | done (Codex, merged) |
 | 11 | Watchlist hygiene: boards with 0 jobs for 4+ weeks or repeated 404 are re-resolved or dropped; report the count | stale boards waste requests | open |
-| 12 | Check tier triage: 98 Check jobs/day is too many to read; rank Check by evidence strength and collapse low-signal ones | user time | open |
+| 12 | Check tier triage: 98 Check jobs/day is too many to read; rank Check by evidence strength and collapse low-signal ones | user time | done (branch) |
