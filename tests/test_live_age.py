@@ -31,6 +31,16 @@ def test_ats_url_and_id_use_the_same_live_check(monkeypatch, ats, url):
     assert calls[0] == calls[1]
 
 
+def test_workable_url_uses_actual_board_slug_for_liveness(monkeypatch):
+    job = Job(id="freehire:123", source="freehire",
+              url="https://apply.workable.com/acme-labs-2/j/ABC123/", title="Python Engineer",
+              company="Acme Labs", company_key="acme-labs", description="Python")
+    actual = "https://apply.workable.com/api/v2/accounts/acme-labs-2/jobs/ABC123"
+    monkeypatch.setattr(liveness, "_status", lambda url: liveness.OPEN if url == actual else liveness.CLOSED)
+    assert liveness.can_verify(job)
+    assert liveness.check(job) == liveness.OPEN
+
+
 @pytest.mark.parametrize("age,status,ats,watched,enabled,ghost,expected", [
     (30, "open", True, False, True, False, None),
     (30, "unknown", True, False, True, False, "older than 21 days and not confirmed open"),
