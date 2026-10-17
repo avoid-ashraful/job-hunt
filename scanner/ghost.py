@@ -13,6 +13,7 @@ Signals
     scraped_repost       a third party re-posted the job (page chrome of another site in the text)
     aggregator_source    only seen on an aggregator that rewrites postings, never on an ATS
     thin_description     too short to describe a real job
+    silent_applications  this company repeatedly ignored the user's applications
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from scanner.models import Job
 
 
 class GhostRules:
-    def __init__(self, cfg: dict, history):
+    def __init__(self, cfg: dict, history, silent_applications=None):
         """`history(job)` returns (reposts, concurrent): other ids with the same company+title
         first seen well before this one, and copies first seen around the same time."""
         self.weights = cfg["weights"]
@@ -36,6 +37,8 @@ class GhostRules:
         self.evergreen = [re.compile(p, re.I) for p in cfg["evergreen_text"]]
         self.scraped = [re.compile(p, re.I) for p in cfg["scraped_repost_text"]]
         self.history = history
+        self.silent_applications = silent_applications or (lambda job: 0)
+        self.silent_min = cfg.get("silent_applications_min", 2)
 
     def score(self, job: Job) -> tuple[int, list[str]]:
         reality = job.reality or {}
@@ -57,6 +60,9 @@ class GhostRules:
         source = job.id.split(":", 1)[0]
         if self.aggregators.fullmatch(source):
             fired.append(f"aggregator_source ({source})")
+        silent = self.silent_applications(job)
+        if silent >= self.silent_min:
+            fired.append(f"silent_applications ({silent}x)")
         if len(job.description.strip()) < self.min_chars:
             fired.append("thin_description")
         score = sum(self.weights.get(f.split(" ")[0], 0) for f in fired)
