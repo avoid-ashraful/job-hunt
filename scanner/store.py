@@ -84,7 +84,8 @@ CREATE TABLE IF NOT EXISTS runs (
     run_at TEXT NOT NULL,
     fetched INTEGER, passed INTEGER, new INTEGER, reported INTEGER,
     report TEXT,
-    deferred INTEGER NOT NULL DEFAULT 0
+    deferred INTEGER NOT NULL DEFAULT 0,
+    source_stats TEXT NOT NULL DEFAULT '[]'
 );
 """
 
@@ -98,6 +99,8 @@ class Store:
         cols = {row[1] for row in self.db.execute("PRAGMA table_info(runs)")}
         if "deferred" not in cols:
             self.db.execute("ALTER TABLE runs ADD COLUMN deferred INTEGER NOT NULL DEFAULT 0")
+        if "source_stats" not in cols:
+            self.db.execute("ALTER TABLE runs ADD COLUMN source_stats TEXT NOT NULL DEFAULT '[]'")
         cols = {row[1] for row in self.db.execute("PRAGMA table_info(reported)")}
         if "ref" not in cols:
             self.db.execute("ALTER TABLE reported ADD COLUMN ref TEXT")
@@ -176,10 +179,11 @@ class Store:
         )
 
     def log_run(self, run_at: str, fetched: int, passed: int, new: int, reported: int, report: str,
-                deferred: int) -> None:
+                deferred: int, source_stats: list[dict] | None = None) -> None:
         self.db.execute(
-            "INSERT INTO runs (run_at, fetched, passed, new, reported, report, deferred) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (run_at, fetched, passed, new, reported, report, deferred),
+            "INSERT INTO runs (run_at, fetched, passed, new, reported, report, deferred, source_stats)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (run_at, fetched, passed, new, reported, report, deferred, json.dumps(source_stats or [])),
         )
 
     def log_decision(self, run_date: str, job_id: str, stage: str, rule: str, outcome: str, detail: str = "") -> None:
