@@ -25,7 +25,7 @@ from scanner.marks import sync as sync_marks
 from scanner.companies import load_region_map
 from scanner.company_profile import CompanyProfiles
 from scanner import liveness
-from scanner.dedup import collapse_by_seniority, description_fingerprint, fingerprint
+from scanner.dedup import collapse_by_seniority, description_fingerprint, fingerprint, merge_jobs
 from scanner.eligibility import NEGATIVE, POSITIVE, Screener, check_evidence
 from scanner.filters import Filters
 from scanner.ghost import GhostRules
@@ -125,12 +125,12 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         dropped.append((job, reason))
         store.log_decision(today, job.id, stage, rule, "drop", reason)
 
-    # 1. fetch, deduplicating by id (one job can appear under several categories)
+    # 1. fetch and merge copies before filtering so employer text and board enrichment survive
     src = cfg["sources"]["freehire"]
     if days is None:
         days = src["first_run_days"] if store.is_empty() else src["daily_lookback_days"]
     log.info("fetching jobs first seen in the last %s days", days)
-    fetched: dict[str, Job] = {}
+    fetched_jobs: list[Job] = []
     source_cfg = dict(cfg["sources"])
     watch_cfg = cfg.get("sources", {}).get("ats", {})
     watch_path = ROOT / watch_cfg.get("watchlist_file", "private/config/watchlist.yml")
@@ -148,10 +148,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
                                  run_cfg.get("fetch_workers", 4)):
         if job.company_key in watched_keys or tuple(job.id.split(":", 2)[:2]) in watched_boards:
             job.watchlist = True
-        if (have := fetched.get(job.id)) is None:
-            fetched[job.id] = job
-        else:
-            _fill_missing(have, job)
+        fetched_jobs.append(job)
+    fetched = merge_jobs(fetched_jobs, _fill_missing)
     for job in fetched.values():
         fill_salary(job)
         store.upsert(job, today)

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable, Iterable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from scanner.models import Job
 
 TRACKING_PARAMS = re.compile(r"^(utm_|gh_src$|source$|ref$|lever-source|src$)", re.I)
 
@@ -55,10 +58,66 @@ def fingerprint(company_key: str, title: str) -> str:
 def description_fingerprint(job) -> str | None:
     """Title + the start of the description: the same job posted under two company names
     (an ATS tenant name vs the brand, a parent vs a subsidiary) has the same text."""
-    text = re.sub(r"[^a-z0-9]+", " ", job.description.lower()).split()
+    description = job.description
+    try:
+        description = description.encode("latin1").decode("utf-8")
+    except UnicodeError:
+        pass
+    text = re.sub(r"[^a-z0-9]+", " ", description.lower()).split()
     if len(text) < 60:  # too short to be distinctive
         return None
     return f"{normalize_title(job.title)}|{' '.join(text[:80])}"
+
+
+def description_variant_fingerprint(job: Job) -> str | None:
+    """A client/brand suffix repeated in the opening line needs matching text too."""
+    match = re.search(r"\s+\(([^()]+)\)$", job.title)
+    if not match or not re.fullmatch(r"[A-Z][a-zA-Z]+", match[1]):
+        return None
+    if seniority_level(match[1], None) != "unknown" or match[1].lower() == "junior":
+        return None
+    opening = job.description.split("\n", 1)[0]
+    if not re.search(rf"\b{re.escape(match[1])}\b", opening):
+        return None
+    if desc := description_fingerprint(job):
+        return f"{normalize_title(job.title[:match.start()])}|{desc.split('|', 1)[1]}"
+    return None
+
+
+def merge_jobs(jobs: Iterable[Job], fill_missing: Callable[[Job, Job], None]) -> dict[str, Job]:
+    """Merge all posting identities before filtering; employer copies supply the text/link."""
+    boards = {"remoteok", "wwr", "workingnomads", "jobicy"}
+    ordered = sorted(jobs, key=lambda j: 0 if j.source == "ats" else 2 if j.source in boards else 1)
+    merged: dict[str, Job] = {}
+    identities: dict[tuple[str, str], str] = {}
+    positions: dict[str, int] = {}
+    for job in ordered:
+        company = normalize_company(job.company)
+        keys = {("id", job.id), ("url", normalize_url(job.url)),
+                ("title", fingerprint(company, job.title))}
+        if desc := description_fingerprint(job):
+            keys.add(("description", desc))
+            keys.add(("variant", f"{company}|{desc}"))
+        if variant := description_variant_fingerprint(job):
+            keys.add(("variant", f"{company}|{variant}"))
+        matches = {identities[k] for k in keys if k in identities}
+        if matches:
+            winner = min(matches, key=positions.__getitem__)
+            for jid in sorted(matches, key=positions.__getitem__):
+                if jid != winner:
+                    fill_missing(merged[winner], merged.pop(jid))
+            fill_missing(merged[winner], job)
+            if len(matches) > 1:
+                for key, jid in identities.items():
+                    if jid in matches:
+                        identities[key] = winner
+        else:
+            winner = job.id
+            merged[winner] = job
+            positions[winner] = len(positions)
+        for key in keys:
+            identities[key] = winner
+    return merged
 
 
 def seniority_level(title: str, enriched: str | None) -> str:
