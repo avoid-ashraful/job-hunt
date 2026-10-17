@@ -76,7 +76,8 @@ def _feedback(url: str, response: requests.Response) -> None:
             delay = min(60, max(0, delay))
             _BACKOFF[host] = max(5, delay)
             _NEXT_REQUEST[host] = max(_NEXT_REQUEST.get(host, 0), time.monotonic() + delay)
-        elif response.status_code < 400 and host in _BACKOFF:
+        elif (response.status_code < 400 or response.status_code == 404) and host in _BACKOFF:
+            # A missing slug is a healthy response too; guessing must not preserve a past throttle forever.
             delay = _BACKOFF[host] / 2
             if delay < 0.25:
                 del _BACKOFF[host]

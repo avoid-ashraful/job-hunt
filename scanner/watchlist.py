@@ -34,26 +34,27 @@ from scanner.sources.ats import (
 
 log = logging.getLogger(__name__)
 
+# Label boundaries avoid rescanning every suffix of large embedded tokens.
 ATS_LINKS = {
-    "workday": re.compile(r"([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)", re.I),
+    "workday": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)", re.I),
     "rippling": re.compile(r"ats\.rippling\.com/([a-z0-9_-]+)/jobs", re.I),
-    "jazzhr": re.compile(r"([a-z0-9-]+)\.applytojob\.com/apply", re.I),
-    "homerun": re.compile(r"([a-z0-9-]+)\.homerun\.co", re.I),
+    "jazzhr": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.applytojob\.com/apply", re.I),
+    "homerun": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.homerun\.co", re.I),
     "dover": re.compile(r"app\.dover\.com/(?:jobs/([a-z0-9_-]+)|[^/\s\"<>]+/careers/([0-9a-f-]{36}))", re.I),
     "comeet": re.compile(r"(?:www\.)?comeet\.com/jobs/([a-z0-9-]+)/([A-Z0-9.]+)", re.I),
-    "factorial": re.compile(r"([a-z0-9-]+)\.factorial(?:hr)?\.com", re.I),
+    "factorial": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.factorial(?:hr)?\.com", re.I),
     "greenhouse": re.compile(r"(?:boards|job-boards)\.greenhouse\.io/(?:embed/job_board\?for=)?([^/?#\"'<>&\s]+)", re.I),
     "lever": re.compile(r"jobs\.lever\.co/([^/?#\"'<>&\s]+)", re.I),
     "lever_eu": re.compile(r"jobs\.eu\.lever\.co/([^/?#\"'<>&\s]+)", re.I),
     "ashby": re.compile(r"jobs\.ashbyhq\.com/([^/?#\"'<>&\s]+)", re.I),
-    "workable": re.compile(r"apply\.workable\.com/([^/?#\"'<>&\s]+)|([a-z0-9-]+)\.workable\.com", re.I),
+    "workable": re.compile(r"apply\.workable\.com/([^/?#\"'<>&\s]+)|(?<![a-z0-9-])([a-z0-9-]+)\.workable\.com", re.I),
     "smartrecruiters": re.compile(r"jobs\.smartrecruiters\.com/([^/?#\"'<>&\s]+)", re.I),
-    "recruitee": re.compile(r"([a-z0-9-]+)\.recruitee\.com", re.I),
-    "breezy": re.compile(r"([a-z0-9-]+)\.breezy\.hr", re.I),
-    "personio": re.compile(r"([a-z0-9-]+)\.jobs\.personio\.(?:de|com)", re.I),
-    "bamboohr": re.compile(r"([a-z0-9-]+)\.bamboohr\.com", re.I),
-    "pinpoint": re.compile(r"([a-z0-9-]+)\.pinpointhq\.com", re.I),
-    "teamtailor": re.compile(r"([a-z0-9-]+)\.teamtailor\.com", re.I),
+    "recruitee": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.recruitee\.com", re.I),
+    "breezy": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.breezy\.hr", re.I),
+    "personio": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.jobs\.personio\.(?:de|com)", re.I),
+    "bamboohr": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.bamboohr\.com", re.I),
+    "pinpoint": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.pinpointhq\.com", re.I),
+    "teamtailor": re.compile(r"(?<![a-z0-9-])([a-z0-9-]+)\.teamtailor\.com", re.I),
 }
 
 
@@ -103,8 +104,6 @@ def _slugs(company: dict) -> list[str]:
         name.replace("-", ""),
         stem,
         alphanumeric,
-        f"{name}hq",
-        f"{stem}hq",
     ]
     return list(dict.fromkeys(x for x in candidates if x and len(x) >= 2))
 
