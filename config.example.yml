@@ -19,6 +19,7 @@ sources:
     watchlist_file: private/config/watchlist.yml
     workers: 5                     # concurrent companies in a daily run
     build_workers: 8               # concurrent company resolutions during build
+    build_max_minutes: 20          # a build stops here and saves; the next build continues
     max_board_jobs: 500            # cap paginated SmartRecruiters boards
     request_delay_s: 0.2           # between pages on one board
     hq_deny_countries: [in, bd]    # ISO HQ countries excluded from the watchlist

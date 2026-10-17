@@ -452,7 +452,8 @@ def main() -> None:
             db_path = ROOT / cfg["output"]["state_dir"] / "scanner.sqlite"
             seeds = ROOT / "watchlist.seeds.yml"
             print(watchlist.build(vendor, path, cache, workers=ats_cfg.get("build_workers", 8), seeds_file=seeds,
-                                  deny_countries=denied, hq_lookup=_hq_lookup(cfg, db_path), db_path=db_path, cfg=cfg))
+                                  deny_countries=denied, hq_lookup=_hq_lookup(cfg, db_path), db_path=db_path, cfg=cfg,
+                                  max_seconds=60 * ats_cfg.get("build_max_minutes", 20)))
         elif args.action == "grow":
             _, store = load(args.config)
             print(watchlist.grow(store.db, path, deny_countries=denied, cfg=cfg))

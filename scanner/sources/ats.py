@@ -29,8 +29,9 @@ _NEXT_REQUEST: dict[str, float] = {}
 
 
 def _pace(url: str) -> None:
-    host = urlparse(url).hostname or ""
-    interval = 1.0 if host == "apply.workable.com" else 0.1
+    """Space requests per provider: every <company>.recruitee.com shares Recruitee's rate limit."""
+    host = ".".join((urlparse(url).hostname or "").split(".")[-2:])
+    interval = 1.0 if host == "workable.com" else 0.25
     with _RATE_LOCK:
         now = time.monotonic()
         scheduled = max(now, _NEXT_REQUEST.get(host, 0))

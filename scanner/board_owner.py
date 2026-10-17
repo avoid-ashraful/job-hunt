@@ -1,0 +1,113 @@
+"""Does this ATS board belong to the company we guessed it for?
+
+A slug guess ("basecamp" on Personio) can hit a different company's board, a demo
+board, or a board that redirects to an unrelated custom domain. The board's own
+landing page names its owner (<title>, og:site_name), so a guessed board is accepted
+only when that name matches the company, or the page links to the company's website.
+Boards found on the company's own careers page are trusted and skip this check.
+"""
+
+from __future__ import annotations
+
+import html
+import re
+from urllib.parse import quote, urlparse
+
+import requests
+
+from scanner.sources.ats import _pace
+
+LANDING = {
+    "greenhouse": "https://job-boards.greenhouse.io/{b}",
+    "lever": "https://jobs.lever.co/{b}",
+    "lever_eu": "https://jobs.eu.lever.co/{b}",
+    "ashby": "https://jobs.ashbyhq.com/{b}",
+    "workable": "https://apply.workable.com/{b}/",
+    "smartrecruiters": "https://careers.smartrecruiters.com/{b}",
+    "recruitee": "https://{b}.recruitee.com/",
+    "breezy": "https://{b}.breezy.hr/",
+    "bamboohr": "https://{b}.bamboohr.com/careers",
+    "pinpoint": "https://{b}.pinpointhq.com/",
+    "personio": "https://{b}.jobs.personio.de/",
+    "teamtailor": "https://{b}.teamtailor.com/",
+}
+ATS_DOMAINS = ("greenhouse.io", "lever.co", "ashbyhq.com", "workable.com", "smartrecruiters.com", "recruitee.com",
+               "breezy.hr", "bamboohr.com", "pinpointhq.com", "personio.de", "personio.com", "teamtailor.com")
+# Words that don't identify a company: legal forms, "Jobs at", domain suffixes.
+NOISE = set("""inc ltd llc gmbh corp corporation co company limited plc bv ag sa srl ab oy as aps
+technologies technology tech labs lab software hq group holdings io ai app com net org dev
+the jobs job careers career openings current at bei with join us work team search page
+greenhouse lever ashby workable smartrecruiters recruitee breezy bamboohr pinpoint personio teamtailor""".split())
+# Pages that list many companies: an ATS link found there says nothing about who owns it.
+AGGREGATORS = ("ycombinator.com", "himalayas.app", "startup.jobs", "workable.com", "linkedin.com", "angel.co",
+               "wellfound.com", "notion.site")
+DEMO = re.compile(r"\b(?:hooli|acme corp(?:oration)?|lorem ipsum|sample job|\(sample\)|demo company)\b|\"acme\"", re.I)
+OWNER_FIELDS = (
+    re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S),
+    re.compile(r"<meta[^>]+property=[\"']og:(?:site_name|title)[\"'][^>]+content=[\"']([^\"']+)", re.I),
+)
+
+
+def _tokens(name: str) -> list[str]:
+    return [t for t in re.findall(r"[a-z0-9]+", html.unescape(name).lower()) if t not in NOISE]
+
+
+def _domain(url: str) -> str:
+    host = (urlparse(url if "//" in url else f"//{url}").hostname or "").removeprefix("www.")
+    return ".".join(host.split(".")[-2:]) if host else ""
+
+
+def names_match(owner: str, company: str) -> bool:
+    """Same company name once legal forms and "Jobs at" are removed ("Jobs at Kentik" = "Kentik Technologies Inc.")."""
+    a, b = _tokens(owner), _tokens(company)
+    return bool(a and b) and (a == b or "".join(a) == "".join(b))
+
+
+def owner_names(page: str) -> list[str]:
+    names = []
+    for rx in OWNER_FIELDS:
+        for raw in rx.findall(page):
+            names += [p.strip() for p in re.split(r"\s+[|\-–—:]\s+", html.unescape(raw).strip()) if p.strip()]
+    return names
+
+
+def _get(session: requests.Session, url: str):
+    try:
+        _pace(url)
+        return session.get(url, timeout=10)
+    except requests.RequestException:
+        return None
+
+
+def owns(session: requests.Session, ats: str, board: str, company: str, website: str = "") -> bool | None:
+    """True/False when the landing page answers; None when it couldn't be read (retry later)."""
+    template = LANDING.get(ats)
+    if not template:
+        return False
+    resp = _get(session, template.format(b=quote(board, safe="")))
+    if resp is None or resp.status_code == 429 or resp.status_code >= 500:
+        return None
+    site, final = _domain(website), _domain(resp.url)
+    wanted = "".join(_tokens(company))
+    if final and not any(final.endswith(d) for d in ATS_DOMAINS):
+        # The board forwards to a careers site: the company that set up the redirect owns the board.
+        labels = {re.sub(r"[^a-z0-9]", "", x) for x in (urlparse(resp.url).hostname or "").lower().split(".")}
+        return final == site or (len(wanted) >= 4 and wanted in labels)  # careers.godaddy, not prismanet.nl
+    if not resp.ok:
+        return False
+    page = resp.text
+    if DEMO.search(page):
+        return False
+    if ats == "pinpoint":  # demo accounts look real on the landing page; their postings don't
+        postings = _get(session, f"https://{quote(board, safe='')}.pinpointhq.com/postings.json")
+        if postings is None or postings.status_code == 429:
+            return None
+        if DEMO.search(postings.text):
+            return False
+    names = [n for n in owner_names(page) if _tokens(n)]
+    if any(names_match(name, company) for name in names):
+        return True
+    if site and re.search(rf"(?:https?://|[\"'/.@])(?:www\.)?{re.escape(site)}\b", page):
+        return True
+    # A page that names nobody (a script-rendered board): only an exact, distinctive slug counts.
+    return not names and len(wanted) >= 6 and re.sub(r"[^a-z0-9]", "", board.lower()) == wanted

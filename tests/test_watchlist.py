@@ -162,7 +162,7 @@ def test_build_cache_and_hq_exclusion(tmp_path, monkeypatch):
     called = []
     def resolve(seed, hints=None):
         called.append(seed["company"])
-        return {"ats": "ashby", "board": "example", "reason": "verified slug"}
+        return {"ats": "ashby", "board": "example", "reason": "verified slug", "owner_check": watchlist.OWNER_CHECK}
     monkeypatch.setattr(watchlist, "resolve_company", resolve)
     path = tmp_path / "watch.yml"
     cache = tmp_path / "cache"

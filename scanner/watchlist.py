@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import sqlite3
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
@@ -15,6 +16,9 @@ from urllib.parse import quote, urljoin, urlparse
 import requests
 import yaml
 
+from scanner.board_owner import AGGREGATORS, DEMO, _domain, owns
+
+OWNER_CHECK = 2  # bump when the ownership check changes, so earlier verdicts are redone
 from scanner.dedup import normalize_company
 from scanner.sources.ats import (
     USER_AGENT,
@@ -238,7 +242,7 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
         if ats == "bamboohr":
             return isinstance(data, dict) and bool(data.get("result"))
         if ats == "pinpoint":
-            return isinstance(data, dict) and bool(data.get("data"))
+            return isinstance(data, dict) and bool(data.get("data")) and not DEMO.search(json.dumps(data))
         if not isinstance(data, dict):
             return False
         if ats == "greenhouse":
@@ -327,26 +331,39 @@ def resolve_company(company: dict, session: requests.Session | None = None,
             except requests.RequestException as exc:
                 failures.append(f"careers page: {type(exc).__name__}")
 
-        # 2. Check candidate boards found in HTML (careers link / embed)
+        # 2. Check candidate boards found in HTML (careers link / embed). A link on a page that lists many
+        #    companies (an HN thread, an aggregator) is just a guess and must pass the ownership check.
         limited = False
+        shared_page = any(_domain(u).endswith(AGGREGATORS) for u in filter(None, (careers_url, website)))
         for ats, board in dict.fromkeys(links):
             valid = _check_board(session, ats, board, cname, cweb)
             limited |= valid is None
-            if valid:
-                return {"ats": ats, "board": board, "reason": "careers link"}
+            if not valid:
+                continue
+            if shared_page:
+                owner = owns(session, ats, board, cname, "")
+                limited |= owner is None
+                if not owner:
+                    continue
+                return {"ats": ats, "board": board, "reason": "verified slug", "owner_check": OWNER_CHECK}
+            return {"ats": ats, "board": board, "reason": "careers link"}
 
         # 3. Slug guessing across supported ATSs
         slugs = _slugs(company)
         ats_candidates = (
-            "ashby", "greenhouse", "lever", "lever_eu", "workable",
+            "ashby", "greenhouse", "lever", "lever_eu",
             "recruitee", "breezy", "bamboohr", "pinpoint", "personio", "teamtailor", "smartrecruiters"
         )
         guesses = [(ats, slug) for slug in slugs for ats in ats_candidates]
         for ats, board in dict.fromkeys(guesses):
             valid = _check_board(session, ats, board, cname, cweb)
             limited |= valid is None
-            if valid:
-                return {"ats": ats, "board": board, "reason": "verified slug"}
+            if not valid:
+                continue
+            owner = owns(session, ats, board, cname, cweb)  # a guessed slug can be someone else's board
+            limited |= owner is None
+            if owner:
+                return {"ats": ats, "board": board, "reason": "verified slug", "owner_check": OWNER_CHECK}
 
         reason = "rate limited while probing a board" if limited else "no supported ATS board found"
         if failures:
@@ -395,10 +412,60 @@ def _is_excluded(seed: dict, filters_cfg: dict) -> bool:
     return False
 
 
+def _unverified_guess(cached: Path) -> dict | None:
+    """The cached result of a slug guess made before boards were checked for ownership."""
+    if not cached.exists():
+        return None
+    try:
+        result = json.loads(cached.read_text())
+    except ValueError:
+        return None
+    if result.get("ats") and result.get("reason") == "verified slug" and result.get("owner_check") != OWNER_CHECK:
+        return result
+    return None
+
+
+def verify_owners(by_key: dict[str, dict], cache_dir: Path, workers: int = 8,
+                  known: set[str] | None = None) -> dict[str, int]:
+    """Drop watched boards that a slug guess attached to the wrong company (or a demo board).
+
+    A board whose page can't be read right now stays only if it was already watched (`known`)."""
+    todo = [(key, entry, cache_dir / f"{key}.json") for key, entry in by_key.items()
+            if entry.get("ats") and _unverified_guess(cache_dir / f"{key}.json")]
+    stats = {"checked": len(todo), "kept": 0, "dropped": 0, "unknown": 0}
+    session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
+
+    def check(item):
+        key, entry, _ = item
+        return owns(session, entry["ats"], entry["board"], entry["company"], entry.get("website", ""))
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for (key, entry, cached), owner in zip(todo, pool.map(check, todo)):
+            if owner is None:
+                stats["unknown"] += 1
+                if known is not None and key not in known:
+                    by_key.pop(key)
+                continue
+            result = json.loads(cached.read_text())
+            if owner:
+                result["owner_check"] = OWNER_CHECK
+                stats["kept"] += 1
+            else:
+                log.info("watchlist: %s/%s isn't %s's board, dropped", entry["ats"], entry["board"], entry["company"])
+                result = {"reason": "guessed board belongs to another company", "status": "miss",
+                          "rejected": f"{entry['ats']}/{entry['board']}", "resolver_version": 2}
+                by_key.pop(key)
+                stats["dropped"] += 1
+            cached.write_text(json.dumps(result))
+    return stats
+
+
 def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: int = 8,
           deny_countries: tuple[str, ...] = ("in", "bd"), hq_lookup=None,
           db_path: Path | None = None, seeds_file: Path | None = None,
-          cfg: dict | None = None, max_attempts: int = 3, force_retry: bool = False) -> dict:
+          cfg: dict | None = None, max_attempts: int = 3, force_retry: bool = False,
+          max_seconds: float = 1200, save_every: int = 20) -> dict:
     """Seed from remoteintech, tracked seeds, and DB evidence; cache results and retry transient failures."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     current = _read(watchlist_file)
@@ -560,12 +627,20 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
 
         pending.append((seed, cached, 1))
 
-    with ThreadPoolExecutor(max_workers=min(12, max(1, workers))) as pool:
-        futures = {
-            pool.submit(resolve_company, seed, hints=hints.get(normalize_company(seed["company"]))):
-            (seed, cache, attempts) for seed, cache, attempts in pending
-        }
-        for future in as_completed(futures):
+    owners = verify_owners(by_key, cache_dir, workers, known={normalize_company(c["company"]) for c in current})
+    stats["resolved"] -= owners["dropped"]
+    stats["owner_check"] = owners
+
+    # Resolve in a bounded time, saving as we go: a killed or timed-out build keeps its progress.
+    deadline = time.monotonic() + max_seconds
+    pool = ThreadPoolExecutor(max_workers=min(12, max(1, workers)))
+    futures = {
+        pool.submit(resolve_company, seed, hints=hints.get(normalize_company(seed["company"]))):
+        (seed, cache, attempts) for seed, cache, attempts in pending
+    }
+    done = 0
+    try:
+        for future in as_completed(futures, timeout=max(1.0, deadline - time.monotonic())):
             seed, cached, attempts = futures[future]
             try:
                 result = future.result()
@@ -598,7 +673,14 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
             else:
                 stats["failed"] += 1
                 failures[result.get("reason", "unknown")] += 1
-
+            done += 1
+            if done % save_every == 0:
+                _write(watchlist_file, list(by_key.values()))
+    except TimeoutError:
+        stats["unfinished"] = len(futures) - done
+        log.warning("watchlist build: time limit reached, %s companies left for the next build", stats["unfinished"])
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     _write(watchlist_file, list(by_key.values()))
     stats["failure_reasons"] = dict(failures)
     return stats
