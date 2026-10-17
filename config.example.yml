@@ -347,4 +347,5 @@ applications:
   ghosted_after_days: 21  # mark an unanswered application ghosted after this many days
 
 report:
+  check_top: 25  # expand top Check jobs; fold the rest by reason, keeping editable marks
   start_here_limit: 15  # show all Apply jobs, then enough top Check jobs to reach this count

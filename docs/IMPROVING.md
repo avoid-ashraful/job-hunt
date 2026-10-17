@@ -30,6 +30,8 @@ Each job has a **Mark** cell in the daily Markdown file. Open `private/jobs/YYYY
 
 The Start here jobs also appear in the full tables. Mark either copy; if both are marked, the Start here mark wins. The next daily scan imports all report marks before filtering. Run `uv run python -m scanner sync` to import them sooner. Re-importing is safe, and changing a mark updates its feedback. A malformed mark is ignored. Clearing a mark back to `[ ]` removes report feedback; an existing application remains in its history.
 
+Check jobs are ranked by evidence strength; `report.check_top` (default 25) limits expanded rows, with the rest grouped by reason in a collapsed block that still accepts marks.
+
 Use `uv run python -m scanner applied <ref> [note]` if you applied without editing the report. Use `uv run python -m scanner app <ref> interview|rejected|offer|ghosted|withdrawn [note]` as the process changes. `uv run python -m scanner status` lists active applications, days since applying, and the response rate. Applications still at `applied` after `applications.ghosted_after_days` become ghosted. Multiple ghosted applications at one company add a configurable weak signal to future ghost scores.
 
 The optional `scanner feedback <ref> <label> [note]` command still works.
