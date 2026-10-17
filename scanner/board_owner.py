@@ -15,7 +15,7 @@ from urllib.parse import quote, urlparse
 
 import requests
 
-from scanner.sources.ats import _pace
+from scanner.sources.ats import _request
 
 LANDING = {
     "greenhouse": "https://job-boards.greenhouse.io/{b}",
@@ -73,18 +73,20 @@ def owner_names(page: str) -> list[str]:
 
 def _get(session: requests.Session, url: str):
     try:
-        _pace(url)
-        return session.get(url, timeout=10)
+        return _request(session, url, retries=2, timeout=7)
     except requests.RequestException:
         return None
 
 
-def owns(session: requests.Session, ats: str, board: str, company: str, website: str = "") -> bool | None:
+def owns(session: requests.Session, ats: str, board: str, company: str, website: str = "",
+         aliases: list[str] | None = None, raise_on_limit: bool = False) -> bool | None:
     """True/False when the landing page answers; None when it couldn't be read (retry later)."""
     template = LANDING.get(ats)
     if not template:
         return False
     resp = _get(session, template.format(b=quote(board, safe="")))
+    if raise_on_limit and resp is not None and resp.status_code == 429:
+        raise requests.HTTPError("rate limited", response=resp)
     if resp is None or resp.status_code == 429 or resp.status_code >= 500:
         return None
     site, final = _domain(website), _domain(resp.url)
@@ -100,12 +102,14 @@ def owns(session: requests.Session, ats: str, board: str, company: str, website:
         return False
     if ats == "pinpoint":  # demo accounts look real on the landing page; their postings don't
         postings = _get(session, f"https://{quote(board, safe='')}.pinpointhq.com/postings.json")
+        if raise_on_limit and postings is not None and postings.status_code == 429:
+            raise requests.HTTPError("rate limited", response=postings)
         if postings is None or postings.status_code == 429:
             return None
         if DEMO.search(postings.text):
             return False
     names = [n for n in owner_names(page) if _tokens(n)]
-    if any(names_match(name, company) for name in names):
+    if any(names_match(name, target) for name in names for target in [company, *(aliases or [])]):
         return True
     if site and re.search(rf"(?:https?://|[\"'/.@])(?:www\.)?{re.escape(site)}\b", page):
         return True

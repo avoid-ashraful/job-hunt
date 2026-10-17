@@ -7,6 +7,7 @@ import json
 import pytest
 
 from scanner import board_owner, watchlist
+from scanner.sources import ats
 from scanner.board_owner import names_match, owns
 
 
@@ -27,6 +28,7 @@ def test_names_match(owner, company, same):
 
 class Resp:
     def __init__(self, text, url, code=200):
+        self.headers = {}
         self.text, self.url, self.status_code, self.ok = text, url, code, code < 400
 
 
@@ -34,8 +36,16 @@ class Session:
     def __init__(self, resp):
         self.resp = resp
 
-    def get(self, url, timeout=None):
+    def get(self, url, **kwargs):
         return self.resp
+
+
+@pytest.fixture(autouse=True)
+def no_wait(monkeypatch):
+    monkeypatch.setattr(ats, "_pace", lambda url: None)
+    monkeypatch.setattr(ats.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(ats, "_NEXT_REQUEST", {})
+    monkeypatch.setattr(ats, "_BACKOFF", {})
 
 
 def test_owns_reads_the_landing_page():

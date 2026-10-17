@@ -1,5 +1,7 @@
 # Tracked seed list of verified worldwide / EOR remote employers.
 # Schema: company name, website, and why note explaining their worldwide remote policy.
+# Optional ats + board select an exact board (validated live, without slug guessing).
+# Optional aliases: [Other Company Name] accepts those names during ownership checks.
 
 companies:
   - company: Automattic
@@ -47,3 +49,15 @@ companies:
   - company: 10up
     website: https://10up.com
     why: Fully remote digital consultancy with engineers across 30+ countries
+  - company: Stack Overflow
+    website: https://stackoverflow.co
+    ats: greenhouse
+    board: stackexchange
+    aliases: [Stack Exchange]
+    why: Distributed team with remote engineering roles; check each posting for eligible locations
+  - company: Veeva Systems
+    website: https://www.veeva.com
+    ats: lever
+    board: veeva
+    aliases: [Veeva]
+    why: Work Anywhere policy; check each posting for eligible locations
