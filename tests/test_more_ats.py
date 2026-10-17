@@ -176,3 +176,13 @@ def test_freehire_workday_ids_are_usable():
     assert _more_ats.base("workday", "keybank.wd5.myworkdayjobs.com/External_Career_Site")[0] == \
         "https://keybank.wd5.myworkdayjobs.com/wday/cxs/keybank/External_Career_Site/jobs"
     assert watchlist._ats_from_id("workday:garbage:1") is None
+
+
+@pytest.mark.parametrize("job_id,expected", [
+    ("comeet:Dario.Health/34.006:6E.F6D", ("comeet", "Dario.Health|34.006")),
+    ("factorial:natulim.factorial.es:325580", ("factorial", "natulim")),
+    ("comeet:bad:1", None),
+])
+def test_freehire_board_forms_are_normalized(job_id, expected):
+    from scanner import watchlist
+    assert watchlist._ats_from_id(job_id) == expected

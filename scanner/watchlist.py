@@ -830,9 +830,9 @@ def _ats_from_id(job_id: str) -> tuple[str, str] | None:
         "workday", "rippling", "jazzhr", "homerun", "dover", "comeet", "factorial"
     }:
         return None
-    if parts[0] == "workday":
+    if parts[0] in _more_ats.NAMES:
         try:
-            return "workday", "|".join(_more_ats._workday(parts[1]))
+            return parts[0], _more_ats.canonical(parts[0], parts[1])
         except ValueError:
             return None
     return parts[0], parts[1]

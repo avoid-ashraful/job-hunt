@@ -10,14 +10,25 @@ from urllib.parse import quote, urljoin, urlsplit
 NAMES = {"workday", "rippling", "jazzhr", "homerun", "dover", "comeet", "factorial"}
 
 
+def canonical(ats: str, board: str) -> str:
+    """Our board form; freehire's job ids use host/path forms for some of these ATSs."""
+    if ats == "workday":
+        if m := re.fullmatch(r"([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/([^/]+)", board, re.I):
+            return f"{m[1].lower()}|{m[2].lower()}|{m[3]}"
+        if board.count("|") != 2:
+            raise ValueError(f"invalid Workday board: {board}")
+    elif ats == "comeet":
+        board = board.replace("/", "|", 1) if "|" not in board else board
+        if board.count("|") != 1:
+            raise ValueError(f"invalid Comeet board: {board}")
+    elif ats == "factorial" and "." in board:
+        board = board.split(".", 1)[0]
+    return board
+
+
 def _workday(board: str) -> tuple[str, str, str]:
-    """Our `tenant|wdN|site` board, or freehire's `tenant.wdN.myworkdayjobs.com/site` in its job ids."""
-    if m := re.fullmatch(r"([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/([^/]+)", board, re.I):
-        return m[1].lower(), m[2].lower(), m[3]
-    parts = board.split("|")
-    if len(parts) != 3:
-        raise ValueError(f"invalid Workday board: {board}")
-    return parts[0], parts[1], parts[2]
+    tenant, wd, site = canonical("workday", board).split("|")
+    return tenant, wd, site
 
 
 def landing(ats: str, board: str) -> str:
@@ -27,7 +38,7 @@ def landing(ats: str, board: str) -> str:
             raise ValueError("invalid Workday host")
         return f"https://{tenant}.{wd}.myworkdayjobs.com/{quote(site, safe='')}"
     if ats == "comeet":
-        slug, uid = board.split("|")
+        slug, uid = canonical(ats, board).split("|")
         return f"https://www.comeet.com/jobs/{quote(slug, safe='')}/{quote(uid, safe='')}"
     if ats == "dover":
         return f"https://app.dover.com/company/careers/{quote(board, safe='')}"
@@ -35,6 +46,7 @@ def landing(ats: str, board: str) -> str:
 
 
 def base(ats: str, board: str) -> tuple[str, dict]:
+    board = canonical(ats, board)
     slug = quote(board, safe="")
     if ats == "workday":
         tenant, wd, site = _workday(board)
