@@ -54,11 +54,11 @@ relevant sentences, not the whole posting.
    - ✅ **Apply**: the text confirms eligibility and the fit is good
    - 🟡 **Check**: not confirmed, but the tags are compatible or the company is known to hire worldwide
    - ⚪ **Long shots**: only a region tag that excludes you
-   Every job has a Ref for feedback.
+   Every job has a Ref and an editable Mark cell for feedback. The report opens with a short Start here list.
 
 ## Self-learning
 
-Every decision, AI call, spot-check and piece of feedback is logged. After a week,
+Every decision, AI call, spot-check and piece of feedback is logged. Edit a daily report’s Mark cell (`[a]` applied, `[g]` good, `[x]` not eligible, `[e]` eligible, `[r]` not relevant, `[d]` duplicate, `[c]` closed; add a note like `[x US only]`). The next run syncs marks, or run `uv run python -m scanner sync` immediately. Applications have status history, and unanswered applications become ghosted after the configured number of days. After a week,
 `uv run python -m scanner learn --days 7` writes an improvement report: rule
 accuracy, triggers that could become rules, uncovered phrases and feedback.
 See [docs/IMPROVING.md](docs/IMPROVING.md).
@@ -108,7 +108,11 @@ echo "GEMINI_API_KEY=..." > private/config/.env
 uv run python -m scanner run              # full run: writes today's list, marks jobs as reported
 uv run python -m scanner run --dry-run    # print only; nothing is marked as reported
 uv run python -m scanner run --skip-llm   # rules only (ambiguous jobs go to Check)
-uv run python -m scanner feedback <ref> <label> [note]
+uv run python -m scanner sync              # import marks edited in daily files
+uv run python -m scanner applied <ref> [note]
+uv run python -m scanner app <ref> <status> [note]  # interview/rejected/offer/ghosted/withdrawn
+uv run python -m scanner status            # active applications and response rate
+uv run python -m scanner feedback <ref> <label> [note]  # optional CLI alternative
 uv run python -m scanner learn --days 7
 uv run python -m scanner run --days 7     # override the fetch window
 uv run pytest
@@ -116,3 +120,5 @@ uv run pytest
 
 Cron (server in UTC): `0 5 * * * scripts/daily.sh` runs at 11:00 Asia/Dhaka.
 The first run backfills 21 days; later runs look back 3 days and rely on dedup.
+
+Weekly learning cron (server in UTC): `0 5 * * 6 /home/ubuntu/job_hunt/scripts/weekly-learn.sh` runs at 11:00 Saturday in Asia/Dhaka. The script writes the learning report and a dated log.
