@@ -56,3 +56,5 @@ recording the decision in `private/config/instructions.md`, running `uv run pyte
 comparing a dry run: `uv run python -m scanner run --dry-run --days 3`.
 
 The weekly script is `scripts/weekly-learn.sh`. Install `0 5 * * 6 /home/ubuntu/job_hunt/scripts/weekly-learn.sh` in the UTC server crontab for 11:00 Saturday in Asia/Dhaka.
+
+Salary ranges missing from source fields are conservatively parsed from descriptions before filtering; Pay preserves the matched text, while comparisons use configured currency rates and annual multipliers (currencyless ranges are display-only).

@@ -16,6 +16,8 @@ def _cell(text: str) -> str:
 
 
 def _salary(job: Job) -> str:
+    if original := job.ats_metadata.get("salary_from_text"):
+        return f"{original} (parsed from text)"
     if not (job.salary_min or job.salary_max) or not job.salary_currency:
         return ""
     lo = f"{job.salary_min:,.0f}" if job.salary_min else "?"
@@ -49,7 +51,10 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
         why = f" {_cell(why_text)} |" if with_why else ""
         code = (sc.get("hq_country") or "").upper()
         hq = f"{''.join(chr(127397 + ord(c)) for c in code)} {code}" if len(code) == 2 else "?"
-        pay = "; ".join(x for x in (sc.get("pay_hint") or _salary(job),
+        salary = _salary(job)
+        if not job.ats_metadata.get("salary_from_text"):
+            salary = sc.get("pay_hint") or salary
+        pay = "; ".join(x for x in (salary,
                                       f"Levels: {sc['pay_tier']}" if sc.get("pay_tier") else "") if x)
         lines.append(
             f"| `{job_ref(job.id)}` | [ ] | {sc.get('fit', '')}/5 | {_cell(job.company)} | {hq} | {'★ watchlist ' if job.watchlist else ''}{_cell(job.title)} | {_cell(who)} | "
