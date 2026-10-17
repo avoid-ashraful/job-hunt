@@ -1,167 +1,178 @@
 [
- {
-  "name": "us_only_piped_header_with_salary",
-  "comment_text": "Acme Health | Senior Backend Engineer, Data Pipeline (Python + Rust) | REMOTE (US only, US time zones; no visa sponsorship) | Full-time | $170k–$210k + equity<p>We build software for hospitals.",
-  "expect": {
-   "company": "Acme Health",
-   "title": "Senior Backend Engineer, Data Pipeline (Python + Rust)",
-   "location": "REMOTE (US only, US time zones; no visa sponsorship)",
-   "regions": [],
-   "id": "hn::1"
+  {
+    "name": "us_only_piped_header_with_salary",
+    "comment_text": "Acme Health | Senior Backend Engineer, Data Pipeline (Python + Rust) | REMOTE (US only, US time zones; no visa sponsorship) | Full-time | $170k–$210k + equity<p>We build software for hospitals.",
+    "expect": {
+      "company": "Acme Health",
+      "title": "Senior Backend Engineer, Data Pipeline (Python + Rust)",
+      "location": "REMOTE (US only, US time zones; no visa sponsorship)",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "worldwide_header_and_escaped_ats_href",
+    "comment_text": "Bolt | Senior Backend Engineer | REMOTE (Worldwide) | $150-200k<p>Python/Django. Apply: <a href=\"https:&#x2F;&#x2F;jobs.lever.co&#x2F;bolt&#x2F;0a1b2c3d-1111-2222-3333-444455556666\" rel=\"nofollow\">https:&#x2F;&#x2F;jobs.lever.co&#x2F;b...</a><p>More at <a href=\"https:&#x2F;&#x2F;bolt.example&#x2F;about\" rel=\"nofollow\">https:&#x2F;&#x2F;bolt.example&#x2F;ab...</a>",
+    "expect": {
+      "company": "Bolt",
+      "title": "Senior Backend Engineer",
+      "location": "Remote worldwide",
+      "regions": [
+        "global"
+      ],
+      "id": "lever:bolt:0a1b2c3d-1111-2222-3333-444455556666",
+      "url": "https://jobs.lever.co/bolt/0a1b2c3d-1111-2222-3333-444455556666"
+    }
+  },
+  {
+    "name": "ats_link_beats_homepage_and_amp_unescaped",
+    "comment_text": "Cobalt | <a href=\"https:&#x2F;&#x2F;cobalt.example\" rel=\"nofollow\">https:&#x2F;&#x2F;cobalt.example...</a> | Staff Backend Engineer | Remote | Full-time<p>Apply <a href=\"https:&#x2F;&#x2F;job-boards.greenhouse.io&#x2F;cobalt&#x2F;jobs&#x2F;123?gh_src=a&amp;x=1\" rel=\"nofollow\">https:&#x2F;&#x2F;job-boards.greenhous...</a>",
+    "expect": {
+      "company": "Cobalt",
+      "title": "Staff Backend Engineer",
+      "location": "Remote",
+      "regions": [],
+      "id": "greenhouse:cobalt:123"
+    }
+  },
+  {
+    "name": "yc_and_nonprofit_parenthetical_dropped_from_company",
+    "comment_text": "Delta (YC S18, non-profit) | Backend Software Engineer | Remote (Global) | <a href=\"https:&#x2F;&#x2F;delta.example&#x2F;jobs\" rel=\"nofollow\">https:&#x2F;&#x2F;delta.example&#x2F;j...</a><p>We hire engineers (worldwide remote).",
+    "expect": {
+      "company": "Delta",
+      "title": "Backend Software Engineer",
+      "location": "Remote worldwide",
+      "regions": [
+        "global"
+      ],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "domain_parenthetical_dropped_from_company",
+    "comment_text": "Echo Capital (echo.example) | Platform Engineer | Full-Time | Remote (US) | $175,000 - $215,000 USD<p>Analytics for funds.",
+    "expect": {
+      "company": "Echo Capital",
+      "title": "Platform Engineer",
+      "location": "Remote (US)",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "middle_dot_separates_roles_and_remote_role_wins",
+    "comment_text": "Foxtrot | Engineering Manager, Data Platform (NYC, Hybrid) · Software Engineer, Quality (Flexible/U.S. Remote) | Full-Time<p>Trading tech.",
+    "expect": {
+      "company": "Foxtrot",
+      "title": "Software Engineer, Quality (Flexible/U.S. Remote)",
+      "location": "Remote",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "url_field_before_remote_and_role",
+    "comment_text": "Gamma | https://gamma.example | Remote (U.S. Eastern/Central Time) | Senior Full Stack Python Developer | U.S. Citizenship Required<p>Hiring.",
+    "expect": {
+      "company": "Gamma",
+      "title": "Senior Full Stack Python Developer",
+      "location": "Remote (U.S. Eastern/Central Time)",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "worldwide_in_customer_blurb_is_not_a_remote_scope",
+    "comment_text": "Helios | Berlin, Germany (or remote, CET/CEST overlap) | Full-time<p>Used by thousands of teams worldwide.<p>Staff Backend Engineer: you will build the control plane.",
+    "expect": {
+      "company": "Helios",
+      "title": "Staff Backend Engineer",
+      "location": "Berlin, Germany (or remote, CET/CEST overlap)",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "worldwide_sentence_in_body_is_enough",
+    "comment_text": "Iris | Full-time | Remote<p>Fully remote anywhere in the world, with some EU overlap.<p>Hiring a Backend Engineer.",
+    "expect": {
+      "company": "Iris",
+      "title": "Backend Engineer",
+      "location": "Remote worldwide",
+      "regions": [
+        "global"
+      ],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "pipeless_company_is_hiring_header",
+    "comment_text": "Juno Pharmacy is hiring engineers for event-driven systems.<p>All roles are remote (US). We need a Staff Software Engineer.",
+    "expect": {
+      "company": "Juno Pharmacy",
+      "title": "Staff Software Engineer",
+      "location": "Remote",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "pipeless_dash_header_with_remote_in_company_parens",
+    "comment_text": "Kilo (Remote US) — Full-Stack Software Engineer — TypeScript / Postgres<p>We build a learning platform.",
+    "expect": {
+      "company": "Kilo",
+      "title": "Full-Stack Software Engineer",
+      "location": "Remote",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "hybrid_or_remote_header_kept_as_location",
+    "comment_text": "Lumen | Lead Platform Engineer | HYBRID (Berlin) or REMOTE (CET ±2h) | Full-time<p>AI agents.",
+    "expect": {
+      "company": "Lumen",
+      "title": "Lead Platform Engineer",
+      "location": "HYBRID (Berlin) or REMOTE (CET ±2h)",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "no_role_in_header_falls_back_to_body_role",
+    "comment_text": "Mica | Multiple roles | Multiple locations | Remote | Full-time<p>We need a Senior Software Engineer for the API.",
+    "expect": {
+      "company": "Mica",
+      "title": "Senior Software Engineer",
+      "location": "Remote",
+      "regions": [],
+      "id": "hn::1"
+    }
+  },
+  {
+    "name": "not_remote_is_dropped",
+    "comment_text": "Nova | Senior Backend Engineer | ONSITE (Austin)<p>Come to the office.",
+    "expect": null
+  },
+  {
+    "name": "role_first_line_without_company_is_dropped",
+    "comment_text": "Senior Python Backend Engineer | REMOTE (EMEA/APAC)<p>We are looking for engineers.",
+    "expect": null
+  },
+  {
+    "name": "non_engineering_role_is_dropped",
+    "comment_text": "Orbit | Product Manager | REMOTE (US) | Full-time<p>Own the roadmap.",
+    "expect": null
+  },
+  {
+    "name": "remote_global_parenthetical",
+    "comment_text": "Brightloop | Senior Python Engineer | REMOTE (Global) | Full-time<p>We build data tooling.",
+    "expect": {
+      "company": "Brightloop",
+      "title": "Senior Python Engineer",
+      "regions": [
+        "global"
+      ]
+    }
   }
- },
- {
-  "name": "worldwide_header_and_escaped_ats_href",
-  "comment_text": "Bolt | Senior Backend Engineer | REMOTE (Worldwide) | $150-200k<p>Python/Django. Apply: <a href=\"https:&#x2F;&#x2F;jobs.lever.co&#x2F;bolt&#x2F;0a1b2c3d-1111-2222-3333-444455556666\" rel=\"nofollow\">https:&#x2F;&#x2F;jobs.lever.co&#x2F;b...</a><p>More at <a href=\"https:&#x2F;&#x2F;bolt.example&#x2F;about\" rel=\"nofollow\">https:&#x2F;&#x2F;bolt.example&#x2F;ab...</a>",
-  "expect": {
-   "company": "Bolt",
-   "title": "Senior Backend Engineer",
-   "location": "Remote worldwide",
-   "regions": [
-    "global"
-   ],
-   "id": "lever:bolt:0a1b2c3d-1111-2222-3333-444455556666",
-   "url": "https://jobs.lever.co/bolt/0a1b2c3d-1111-2222-3333-444455556666"
-  }
- },
- {
-  "name": "ats_link_beats_homepage_and_amp_unescaped",
-  "comment_text": "Cobalt | <a href=\"https:&#x2F;&#x2F;cobalt.example\" rel=\"nofollow\">https:&#x2F;&#x2F;cobalt.example...</a> | Staff Backend Engineer | Remote | Full-time<p>Apply <a href=\"https:&#x2F;&#x2F;job-boards.greenhouse.io&#x2F;cobalt&#x2F;jobs&#x2F;123?gh_src=a&amp;x=1\" rel=\"nofollow\">https:&#x2F;&#x2F;job-boards.greenhous...</a>",
-  "expect": {
-   "company": "Cobalt",
-   "title": "Staff Backend Engineer",
-   "location": "Remote",
-   "regions": [],
-   "id": "greenhouse:cobalt:123"
-  }
- },
- {
-  "name": "yc_and_nonprofit_parenthetical_dropped_from_company",
-  "comment_text": "Delta (YC S18, non-profit) | Backend Software Engineer | Remote (Global) | <a href=\"https:&#x2F;&#x2F;delta.example&#x2F;jobs\" rel=\"nofollow\">https:&#x2F;&#x2F;delta.example&#x2F;j...</a><p>We hire engineers (worldwide remote).",
-  "expect": {
-   "company": "Delta",
-   "title": "Backend Software Engineer",
-   "location": "Remote worldwide",
-   "regions": [
-    "global"
-   ],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "domain_parenthetical_dropped_from_company",
-  "comment_text": "Echo Capital (echo.example) | Platform Engineer | Full-Time | Remote (US) | $175,000 - $215,000 USD<p>Analytics for funds.",
-  "expect": {
-   "company": "Echo Capital",
-   "title": "Platform Engineer",
-   "location": "Remote (US)",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "middle_dot_separates_roles_and_remote_role_wins",
-  "comment_text": "Foxtrot | Engineering Manager, Data Platform (NYC, Hybrid) · Software Engineer, Quality (Flexible/U.S. Remote) | Full-Time<p>Trading tech.",
-  "expect": {
-   "company": "Foxtrot",
-   "title": "Software Engineer, Quality (Flexible/U.S. Remote)",
-   "location": "Remote",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "url_field_before_remote_and_role",
-  "comment_text": "Gamma | https://gamma.example | Remote (U.S. Eastern/Central Time) | Senior Full Stack Python Developer | U.S. Citizenship Required<p>Hiring.",
-  "expect": {
-   "company": "Gamma",
-   "title": "Senior Full Stack Python Developer",
-   "location": "Remote (U.S. Eastern/Central Time)",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "worldwide_in_customer_blurb_is_not_a_remote_scope",
-  "comment_text": "Helios | Berlin, Germany (or remote, CET/CEST overlap) | Full-time<p>Used by thousands of teams worldwide.<p>Staff Backend Engineer: you will build the control plane.",
-  "expect": {
-   "company": "Helios",
-   "title": "Staff Backend Engineer",
-   "location": "Berlin, Germany (or remote, CET/CEST overlap)",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "worldwide_sentence_in_body_is_enough",
-  "comment_text": "Iris | Full-time | Remote<p>Fully remote anywhere in the world, with some EU overlap.<p>Hiring a Backend Engineer.",
-  "expect": {
-   "company": "Iris",
-   "title": "Backend Engineer",
-   "location": "Remote worldwide",
-   "regions": [
-    "global"
-   ],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "pipeless_company_is_hiring_header",
-  "comment_text": "Juno Pharmacy is hiring engineers for event-driven systems.<p>All roles are remote (US). We need a Staff Software Engineer.",
-  "expect": {
-   "company": "Juno Pharmacy",
-   "title": "Staff Software Engineer",
-   "location": "Remote",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "pipeless_dash_header_with_remote_in_company_parens",
-  "comment_text": "Kilo (Remote US) — Full-Stack Software Engineer — TypeScript / Postgres<p>We build a learning platform.",
-  "expect": {
-   "company": "Kilo",
-   "title": "Full-Stack Software Engineer",
-   "location": "Remote",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "hybrid_or_remote_header_kept_as_location",
-  "comment_text": "Lumen | Lead Platform Engineer | HYBRID (Berlin) or REMOTE (CET ±2h) | Full-time<p>AI agents.",
-  "expect": {
-   "company": "Lumen",
-   "title": "Lead Platform Engineer",
-   "location": "HYBRID (Berlin) or REMOTE (CET ±2h)",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "no_role_in_header_falls_back_to_body_role",
-  "comment_text": "Mica | Multiple roles | Multiple locations | Remote | Full-time<p>We need a Senior Software Engineer for the API.",
-  "expect": {
-   "company": "Mica",
-   "title": "Senior Software Engineer",
-   "location": "Remote",
-   "regions": [],
-   "id": "hn::1"
-  }
- },
- {
-  "name": "not_remote_is_dropped",
-  "comment_text": "Nova | Senior Backend Engineer | ONSITE (Austin)<p>Come to the office.",
-  "expect": null
- },
- {
-  "name": "role_first_line_without_company_is_dropped",
-  "comment_text": "Senior Python Backend Engineer | REMOTE (EMEA/APAC)<p>We are looking for engineers.",
-  "expect": null
- },
- {
-  "name": "non_engineering_role_is_dropped",
-  "comment_text": "Orbit | Product Manager | REMOTE (US) | Full-time<p>Own the roadmap.",
-  "expect": null
- }
 ]

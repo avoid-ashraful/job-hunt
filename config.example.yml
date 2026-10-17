@@ -66,7 +66,7 @@ sources:
     max_comment_pages: 15         # bound pages per monthly hiring thread
     request_delay_s: 1.0          # pause between Algolia API pages
     remote_pattern: '\bremote\b' # only explicitly remote posts
-    worldwide_pattern: '\b(worldwide|anywhere in the world|remote globally|global remote)\b' # strong location label
+    worldwide_pattern: '\b(worldwide|anywhere in the world|remote globally|global remote)\b|\bremote\W{0,3}\(\s*(?:global|anywhere)\s*\)' # strong location label
     role_pattern: '\b(?:(?:senior|staff|lead|principal)\s+)?(?:python|django|backend|back-end|platform|software|fullstack|full-stack|api)\s+(?:engineer|developer)\b' # role extraction
   himalayas:
     enabled: true                  # public Himalayas worldwide job search
