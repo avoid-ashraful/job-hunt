@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import logging
 import time
 from collections.abc import Iterator
@@ -45,7 +46,7 @@ def to_job(raw: dict) -> Job:
         title=raw.get("title") or "",
         company=raw.get("company") or raw.get("company_slug") or "",
         company_key=normalize_company(raw.get("company_slug") or raw.get("company") or ""),
-        description=raw.get("description") or "",
+        description=html.unescape(raw.get("description") or ""),  # text format still carries &#xa; etc.
         location=raw.get("location") or "",
         regions=raw.get("regions") or [],
         countries=raw.get("countries") or [],

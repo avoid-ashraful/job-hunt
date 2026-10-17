@@ -281,3 +281,9 @@ def test_malformed_company_page_cannot_abort_other_report_enrichment(monkeypatch
     assert malformed.screen["hq_country"] is None
     assert healthy.screen["hq_country"] == "de"
     assert "example" in caplog.text and "AttributeError" in caplog.text
+
+
+def test_freehire_description_entities_are_decoded():
+    raw = json.loads((Path(__file__).parent / "fixtures" / "freehire" / "job.json").read_text())
+    raw["description"] = "Location:&#xa;- Remote, Worldwide&#xa;Salary &amp; equity"
+    assert to_job(raw).description == "Location:\n- Remote, Worldwide\nSalary & equity"
