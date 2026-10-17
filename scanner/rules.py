@@ -22,6 +22,15 @@ from dataclasses import dataclass, field
 from scanner.models import Job
 
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
+ELIGIBILITY_CUE = re.compile(
+    r"\b(?:work authori[sz]ation|authori[sz]ed to work|visas?|sponsorship|citizen\w*|"
+    r"right to work|work permits?|residen\w*|resid(?:e|es|ing)|based in|located in|"
+    r"relocat\w*|on[ -]?site|hybrid|fully remote|regions?|countr(?:y|ies)|states?|"
+    r"provinces?|(?:not )?limited to|anywhere in)\b", re.I,
+)
+LOCATION_HEADER = re.compile(
+    r"^(?:available |eligible |allowed )?(?:locations?|countries|regions?|states?|provinces?)\s*:?$", re.I,
+)
 LOCKED, POSITIVE, TIMEZONE, AMBIGUOUS, SILENT = "locked", "positive", "timezone", "ambiguous", "silent"
 
 
@@ -139,7 +148,7 @@ class LocationRules:
             if hit or (self.cue.search(sent) and self.geo.search(sent)):
                 snippets.append(sent)
 
-        snippet_text = _cap(snippets, self.max_snippet_chars)
+        snippet_text = self._snippets(job.description, snippets)
         if locks and not positives:
             rule, ev, place = locks[0]
             return Verdict(LOCKED, rule, ev, place, snippet_text)
@@ -155,7 +164,38 @@ class LocationRules:
             return Verdict(TIMEZONE, rule, ev, place, snippet_text)
         if snippets:
             return Verdict(AMBIGUOUS, "unmatched_location_wording", snippets=snippet_text)
-        return Verdict(SILENT, "silent")
+        return Verdict(SILENT, "silent", snippets=snippet_text)
+
+    def _snippets(self, text: str, matched: list[str]) -> list[str]:
+        priority, other = [], []
+        lines = normalize_text(text).splitlines()
+        for i, line in enumerate(lines):
+            if not LOCATION_HEADER.fullmatch(line.strip().strip("*_# ")):
+                continue
+            block = [line.strip()]
+            bulleted = False
+            for following in lines[i + 1:i + 18]:
+                item = following.strip()
+                if not item or re.fullmatch(r"[-=]+", item):
+                    if len(block) > 1:
+                        break
+                    continue
+                if len(item) > 100 or item.endswith(":") or len(block) == 16:
+                    break
+                is_bullet = bool(re.match(r"(?:[-*•]|\d+[.)])\s+", item))
+                if (bulleted and not is_bullet) or (not is_bullet and re.search(r"[.!?]$", item)):
+                    break
+                block.append(item)
+                bulleted = is_bullet
+            if len(block) > 1:
+                priority.append("\n".join(block))
+        for sent in sentences(text):
+            if ELIGIBILITY_CUE.search(sent):
+                priority.append(sent)
+            elif sent in matched or self.geo.search(sent):
+                other.append(sent)
+        # Keep eligibility wording ahead of incidental geography when the input cap fills up.
+        return _cap(priority + matched + other, self.max_snippet_chars)
 
 
 def _place(m: re.Match) -> str:
@@ -165,7 +205,7 @@ def _place(m: re.Match) -> str:
 def _cap(snippets: list[str], limit: int) -> list[str]:
     out, total = [], 0
     for s in dict.fromkeys(snippets):  # dedupe, keep order
-        s = s[:400]
+        s = s[:limit] if "\n" in s else s[:min(400, limit)]
         if total + len(s) > limit:
             break
         out.append(s)
