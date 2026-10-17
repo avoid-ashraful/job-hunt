@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 
+from scanner import liveness
 from scanner.dedup import seniority_level
 from scanner.models import Job
 from scanner.pay_market import DEFAULT_ALLOW, local_only
@@ -27,6 +28,7 @@ class Filters:
         self.profiles = profiles
         self.market = cfg.get("company_market", {})
         self.max_age = timedelta(days=cfg["max_age_days"])
+        self.max_age_live = timedelta(days=cfg.get("max_age_days_live", 45))
         self.max_age_watchlist = timedelta(days=cfg.get("max_age_days_watchlist", 120))
         self.stale_after = timedelta(days=cfg.get("not_seen_live_days", 10))
         self.families = {name: _rx(pats) for name, pats in cfg["role_families"].items()}
@@ -100,10 +102,14 @@ class Filters:
         return None
 
     def _age(self, job: Job) -> str | None:
+        job.screen.pop("needs_live", None)
         anchor = job.age_anchor
         max_age = self.max_age_watchlist if job.watchlist else self.max_age
         if anchor and self.now - anchor > max_age:
-            return f"older than {max_age.days} days (first seen {anchor:%Y-%m-%d})"
+            if not job.watchlist and self.now - anchor < self.max_age_live and liveness.can_verify(job):
+                job.screen["needs_live"] = True
+            else:
+                return f"older than {max_age.days} days (first seen {anchor:%Y-%m-%d})"
         if not job.watchlist and job.last_seen_at and self.now - job.last_seen_at > self.stale_after:
             return f"not seen live since {job.last_seen_at:%Y-%m-%d} (probably closed)"
         return None

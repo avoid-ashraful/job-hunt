@@ -81,6 +81,7 @@ sources:
 filters:
   max_age_days_watchlist: 120   # live watched ATS boards: older posts can still be open
   max_age_days: 21              # age = earliest of posted date and first-seen date
+  max_age_days_live: 45         # older ATS posts below this age need a confirmed-open live check
   not_seen_live_days: 10        # not seen live by the source for this long: probably closed (freehire re-crawls ~weekly)
 
   company_market:

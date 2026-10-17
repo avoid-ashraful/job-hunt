@@ -299,11 +299,15 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         drop(job, "collapse", "lower_seniority", reason)
 
     # 9. ask the employer's ATS whether each posting is still open
-    if cfg.get("liveness", {}).get("enabled", True) and kept:
-        status = liveness.check_all(kept, cfg.get("liveness", {}).get("workers", 8))
+    if kept:
+        status = (liveness.check_all(kept, cfg.get("liveness", {}).get("workers", 8))
+                  if cfg.get("liveness", {}).get("enabled", True) else {})
         open_jobs = []
         for job in kept:
-            if status[job.id] == liveness.CLOSED:
+            if job.screen.get("needs_live") and status.get(job.id) != liveness.OPEN:
+                drop(job, "liveness", "not_confirmed_open",
+                     f"older than {filters.max_age.days} days and not confirmed open")
+            elif status.get(job.id) == liveness.CLOSED:
                 drop(job, "liveness", "closed", "closed: the posting is gone from the employer's site")
             else:
                 open_jobs.append(job)
