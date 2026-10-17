@@ -100,3 +100,11 @@ def test_same_text_under_tenant_and_brand_names_still_merges():
                     company_key="parent-brand", url="https://jobicy.com/42", salary_min=120000)
     assert list(merge_jobs([board, live], _fill_missing).values()) == [live]
     assert live.salary_min == 120000
+
+
+def test_non_ascii_employers_keep_distinct_source_company_keys():
+    first = employer(id="freehire::1", source="freehire", company="百度", company_key="baidu",
+                     url="https://example.com/1", description="Build Python search services.")
+    second = employer(id="freehire::2", source="freehire", company="腾讯", company_key="tencent",
+                      url="https://example.com/2", description="Build Python messaging services.")
+    assert list(merge_jobs([first, second], _fill_missing).values()) == [first, second]

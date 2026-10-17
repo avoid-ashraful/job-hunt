@@ -92,7 +92,7 @@ def merge_jobs(jobs: Iterable[Job], fill_missing: Callable[[Job, Job], None]) ->
     identities: dict[tuple[str, str], str] = {}
     positions: dict[str, int] = {}
     for job in ordered:
-        company = normalize_company(job.company)
+        company = normalize_company(job.company) or job.company_key or job.company.casefold()
         keys = {("id", job.id), ("url", normalize_url(job.url)),
                 ("title", fingerprint(company, job.title))}
         if desc := description_fingerprint(job):
