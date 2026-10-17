@@ -388,6 +388,59 @@
     posting_language: de
   expected:
     outcome: keep
+- name: english-text-tagged-fr-is-kept
+  stage: role
+  job:
+    description: >-
+      We are looking for a Senior Backend Engineer to join our platform team. You will design and
+      build services in Python and Django, own our PostgreSQL data model, and work with product
+      and design on new features. This is a fully remote role with flexible hours. We value clear
+      writing, careful code review and a calm pace. You should have five or more years of
+      experience with web APIs, background jobs with Celery, and cloud infrastructure on AWS.
+    posting_language: fr
+  expected:
+    outcome: keep
+- name: french-text-tagged-fr-is-dropped
+  stage: role
+  job:
+    description: >-
+      Nous recherchons un Ingénieur Backend Senior pour rejoindre notre équipe plateforme. Vous
+      serez responsable de la conception et du développement de nos services en Python et Django,
+      de la gestion de notre base de données PostgreSQL et de la mise en place des tâches
+      asynchrones avec Celery. Le poste est en télétravail complet avec des horaires flexibles.
+      Vous avez au moins cinq ans d'expérience dans le développement d'API web et une bonne
+      connaissance des services cloud sur AWS.
+    posting_language: fr
+  expected:
+    outcome: drop
+    rule: language.fr
+- name: german-text-tagged-de-is-dropped
+  stage: role
+  job:
+    description: >-
+      Wir suchen einen Senior Backend Engineer für unser Plattform-Team. Du entwickelst und
+      betreibst Services mit Python und Django, verantwortest das Datenmodell in PostgreSQL und
+      arbeitest eng mit dem Produktteam an neuen Funktionen. Die Stelle ist komplett remote mit
+      flexiblen Arbeitszeiten. Du bringst mindestens fünf Jahre Erfahrung in der Entwicklung von
+      Web-APIs mit, kennst dich mit Celery aus und hast bereits mit AWS gearbeitet. Wir bieten ein
+      faires Gehalt und ein motiviertes Team.
+    posting_language: de
+  expected:
+    outcome: drop
+    rule: language.de
+- name: english-text-tagged-de-with-german-benefits-is-kept
+  stage: role
+  job:
+    description: >-
+      We are hiring a Senior Backend Engineer to help us scale our payments platform. You will
+      build and maintain services in Python and Django, improve the reliability of our PostgreSQL
+      and Redis setup, and work with the team on the roadmap for the next year. This is a remote
+      role and we meet in person twice a year. You should be comfortable with code review,
+      testing and on-call. Wir bieten ein Jobrad, betriebliche Altersvorsorge und 30 Tage Urlaub
+      für alle Mitarbeitenden.
+    posting_language: de
+  expected:
+    outcome: keep
 - name: frontend-heavy-fullstack
   stage: role
   job:
