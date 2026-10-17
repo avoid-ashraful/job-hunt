@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 import requests
 
@@ -44,7 +45,7 @@ def _ashby_board(board: str) -> frozenset[str] | None:
 def _ats_identity(job: Job) -> tuple[str, str, str] | None:
     ats, _, rest = job.id.partition(":")
     board, _, ext = rest.partition(":")
-    if ats in {"greenhouse", "lever", "ashby", "workable", "smartrecruiters"} and board and ext:
+    if ats in {"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "workday", "rippling", "dover"} and board and ext:
         return ats, board, ext
     if identity := ats_id(job.url, job.company):
         return tuple(identity.split(":", 2))
@@ -57,6 +58,21 @@ def can_verify(job: Job) -> bool:
 
 def check(job: Job) -> str:
     ats, board, ext = _ats_identity(job) or ("", "", "")
+    if ats == "workday" and board and ext:
+        from scanner.sources._more_ats import base, landing
+        try:
+            api, _ = base(ats, board)
+            prefix = landing(ats, board)
+        except ValueError:
+            return UNKNOWN
+        parsed = urlsplit(job.url)
+        if parsed.hostname == urlsplit(prefix).hostname and "/job/" in parsed.path:
+            return _status(api.removesuffix("/jobs") + "/job/" + parsed.path.split("/job/", 1)[1])
+        return UNKNOWN
+    if ats == "rippling" and board and ext:
+        return _status(f"https://ats.rippling.com/api/v2/board/{board}/jobs/{ext}")
+    if ats == "dover" and board and ext:
+        return _status(f"https://app.dover.com/api/v1/inbound/application-portal-job/{ext}")
     if ats == "greenhouse" and board and ext:
         return _status(f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{ext}")
     if ats == "lever" and board and ext:

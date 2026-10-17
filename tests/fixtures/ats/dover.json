@@ -1,0 +1,31 @@
+{
+  "board": "12345678-1234-1234-1234-123456789abc",
+  "response": {
+    "count": 1,
+    "next": null,
+    "results": [
+      {
+        "id": "d1",
+        "title": "Backend Engineer",
+        "is_published": true,
+        "is_sample": false,
+        "workplace_type": "REMOTE",
+        "locations": [
+          {
+            "name": "International"
+          }
+        ]
+      }
+    ]
+  },
+  "detail": {
+    "user_provided_description": "<p>Build Python &amp; Django services.</p>",
+    "created": "2026-10-16T12:00:00Z"
+  },
+  "expected": {
+    "id": "dover:12345678-1234-1234-1234-123456789abc:d1",
+    "url": "https://app.dover.com/apply/12345678-1234-1234-1234-123456789abc/d1",
+    "location": "International"
+  },
+  "link": "https://app.dover.com/Example/careers/12345678-1234-1234-1234-123456789abc"
+}

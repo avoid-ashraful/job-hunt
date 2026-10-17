@@ -16,8 +16,16 @@ from urllib.parse import quote, urlparse
 import requests
 
 from scanner.sources.ats import _request
+from scanner.sources import _more_ats
 
 LANDING = {
+    "workday": "https://{tenant}.{wd}.myworkdayjobs.com/{site}",
+    "rippling": "https://ats.rippling.com/{b}/jobs",
+    "jazzhr": "https://{b}.applytojob.com/apply",
+    "homerun": "https://{b}.homerun.co",
+    "dover": "https://app.dover.com/jobs/{b}",
+    "comeet": "https://www.comeet.com/jobs/{slug}/{uid}",
+    "factorial": "https://{b}.factorialhr.com",
     "greenhouse": "https://job-boards.greenhouse.io/{b}",
     "lever": "https://jobs.lever.co/{b}",
     "lever_eu": "https://jobs.eu.lever.co/{b}",
@@ -32,7 +40,8 @@ LANDING = {
     "teamtailor": "https://{b}.teamtailor.com/",
 }
 ATS_DOMAINS = ("greenhouse.io", "lever.co", "ashbyhq.com", "workable.com", "smartrecruiters.com", "recruitee.com",
-               "breezy.hr", "bamboohr.com", "pinpointhq.com", "personio.de", "personio.com", "teamtailor.com")
+               "breezy.hr", "bamboohr.com", "pinpointhq.com", "personio.de", "personio.com", "teamtailor.com",
+               "myworkdayjobs.com", "rippling.com", "applytojob.com", "homerun.co", "dover.com", "comeet.com", "factorialhr.com", "factorial.com")
 # Words that don't identify a company: legal forms, "Jobs at", domain suffixes.
 NOISE = set("""inc ltd llc gmbh corp corporation co company limited plc bv ag sa srl ab oy as aps
 technologies technology tech labs lab software hq group holdings io ai app com net org dev
@@ -84,7 +93,11 @@ def owns(session: requests.Session, ats: str, board: str, company: str, website:
     template = LANDING.get(ats)
     if not template:
         return False
-    resp = _get(session, template.format(b=quote(board, safe="")))
+    if ats in {"workday", "comeet"} or (ats == "dover" and re.fullmatch(r"[0-9a-f-]{36}", board)):
+        url = _more_ats.landing(ats, board)
+    else:
+        url = template.format(b=quote(board, safe=""))
+    resp = _get(session, url)
     if raise_on_limit and resp is not None and resp.status_code == 429:
         raise requests.HTTPError("rate limited", response=resp)
     if resp is None or resp.status_code == 429 or resp.status_code >= 500:

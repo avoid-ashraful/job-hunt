@@ -178,7 +178,7 @@ def test_guess_order_and_normalized_url_deduplication(monkeypatch):
     watchlist.resolve_company({"company": "Acme"}, Session())
     kinds = list(dict.fromkeys(kind for kind, slug in calls))
     assert kinds == list(watchlist.ATS_ORDER)
-    assert set(kinds) == set(watchlist.ATS_LINKS) - {"workable"}
+    assert set(kinds) == set(watchlist.ATS_LINKS) - {"workable", "workday", "comeet"}
     assert calls.count(("recruitee", "Acme")) == 1
     assert ("recruitee", "acme") not in calls
     assert calls.count(("greenhouse", "acme")) == 1  # URL paths retain case.

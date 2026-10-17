@@ -1,0 +1,11 @@
+{
+  "board": "example",
+  "response": "<li class=\"list-group-item\"><a href=\"https://example.applytojob.com/apply/j1/Backend-Engineer\">Backend Engineer</a><i class=\"fa-map-marker\"></i>Remote, Global</li>",
+  "detail": "<script type=\"application/ld+json\">{\"@type\": \"JobPosting\", \"title\": \"Backend Engineer\", \"description\": \"<p>Build Python &amp; Django services.</p>\", \"datePosted\": \"2026-10-16T12:00:00Z\", \"jobLocationType\": \"TELECOMMUTE\"}</script>",
+  "expected": {
+    "id": "jazzhr:example:j1",
+    "url": "https://example.applytojob.com/apply/j1/Backend-Engineer",
+    "location": "Remote, Global"
+  },
+  "link": "https://example.applytojob.com/apply"
+}

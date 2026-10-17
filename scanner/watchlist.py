@@ -20,6 +20,7 @@ from scanner.board_owner import AGGREGATORS, DEMO, _domain, owns
 
 OWNER_CHECK = 2  # bump when the ownership check changes, so earlier verdicts are redone
 from scanner.dedup import normalize_company, normalize_url
+from scanner.sources import _more_ats
 from scanner.sources.ats import (
     USER_AGENT,
     _base,
@@ -33,6 +34,13 @@ from scanner.sources.ats import (
 log = logging.getLogger(__name__)
 
 ATS_LINKS = {
+    "workday": re.compile(r"([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)", re.I),
+    "rippling": re.compile(r"ats\.rippling\.com/([a-z0-9_-]+)/jobs", re.I),
+    "jazzhr": re.compile(r"([a-z0-9-]+)\.applytojob\.com/apply", re.I),
+    "homerun": re.compile(r"([a-z0-9-]+)\.homerun\.co", re.I),
+    "dover": re.compile(r"app\.dover\.com/(?:jobs/([a-z0-9_-]+)|[^/\s\"<>]+/careers/([0-9a-f-]{36}))", re.I),
+    "comeet": re.compile(r"(?:www\.)?comeet\.com/jobs/([a-z0-9-]+)/([A-Z0-9.]+)", re.I),
+    "factorial": re.compile(r"([a-z0-9-]+)\.factorial(?:hr)?\.com", re.I),
     "greenhouse": re.compile(r"(?:boards|job-boards)\.greenhouse\.io/(?:embed/job_board\?for=)?([^/?#\"'<>&\s]+)", re.I),
     "lever": re.compile(r"jobs\.lever\.co/([^/?#\"'<>&\s]+)", re.I),
     "lever_eu": re.compile(r"jobs\.eu\.lever\.co/([^/?#\"'<>&\s]+)", re.I),
@@ -106,6 +114,8 @@ def _links(html: str) -> list[tuple[str, str]]:
     for ats, pattern in ATS_LINKS.items():
         for m in pattern.finditer(html):
             val = (m.group(1) or (m.group(2) if m.lastindex and m.lastindex >= 2 else None) or "").strip("/ \t'\"")
+            if ats in {"workday", "comeet"}:
+                val = "|".join(m.groups())
             if val and val.lower() not in {"jobs", "careers", "embed", "api", "widget", "assets", "www", "app", "view", "search"}:
                 found.append((ats, val))
 
@@ -146,7 +156,8 @@ def _find_careers_link(html: str, base_url: str) -> str | None:
             thost = (urlparse(full_url).hostname or "").removeprefix("www.").lower()
             if thost == base_host or any(ats_host in thost for ats_host in (
                 "greenhouse.io", "lever.co", "ashbyhq.com", "workable.com",
-                "bamboohr.com", "breezy.hr", "recruitee.com", "personio", "pinpointhq.com", "teamtailor.com"
+                "bamboohr.com", "breezy.hr", "recruitee.com", "personio", "pinpointhq.com", "teamtailor.com",
+                "myworkdayjobs.com", "rippling.com", "applytojob.com", "homerun.co", "dover.com", "comeet.com", "factorialhr.com", "factorial.com"
             )):
                 return full_url
     return None
@@ -193,6 +204,8 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
         elif ats == "bamboohr":
             session.headers["Accept"] = "application/json"
 
+        if ats in _more_ats.NAMES:
+            return bool(_more_ats.rows(session, ats, board, limit=1))
         url, params = _base(ats, board)
         if ats in {"lever", "lever_eu", "smartrecruiters"}:
             params = {**params, "limit": 1}
@@ -285,7 +298,8 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
 
 # Slug-guess order. No Workable: its apply.workable.com quota (~12h lockout) is shared with the daily scan.
 ATS_ORDER = ("greenhouse", "ashby", "lever", "lever_eu", "smartrecruiters",
-             "recruitee", "breezy", "bamboohr", "personio", "teamtailor", "pinpoint")
+             "recruitee", "breezy", "bamboohr", "personio", "teamtailor", "pinpoint",
+             "rippling", "jazzhr", "homerun", "factorial", "dover")  # Workday/Comeet: careers links only
 
 
 def _check_board(session: requests.Session, ats: str, board: str, cname: str, cweb: str,
@@ -577,7 +591,8 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
                     regions = payload.get("regions") or []
                     is_global = "global" in regions or any(
                         jid.startswith(prefix) for prefix in (
-                            "recruitee:", "breezy:", "personio:", "bamboohr:", "pinpoint:", "teamtailor:"
+                            "recruitee:", "breezy:", "personio:", "bamboohr:", "pinpoint:", "teamtailor:",
+                            "workday:", "rippling:", "jazzhr:", "homerun:", "dover:", "comeet:", "factorial:"
                         )
                     )
                     if is_global:
@@ -775,7 +790,8 @@ def _ats_from_id(job_id: str) -> tuple[str, str] | None:
     parts = job_id.split(":", 2)
     if len(parts) < 3 or parts[0] not in {
         "ashby", "greenhouse", "lever", "lever_eu", "workable", "smartrecruiters",
-        "recruitee", "breezy", "personio", "bamboohr", "pinpoint", "teamtailor"
+        "recruitee", "breezy", "personio", "bamboohr", "pinpoint", "teamtailor",
+        "workday", "rippling", "jazzhr", "homerun", "dover", "comeet", "factorial"
     }:
         return None
     return parts[0], parts[1]

@@ -1,0 +1,11 @@
+{
+  "board": "example",
+  "response": "<select><option value='1'>Spain</option></select><li class='job-offer-item' data-job-postings-url='https://example.factorial.com/job_posting/backend-engineer-123' data-location-id='1' data-is-remote='true'><div class='factorial__headingFontFamily'>Backend Engineer</div></li>",
+  "detail": "<div class='styledText'><p>Build Python &amp; Django services.</p></div>",
+  "expected": {
+    "id": "factorial:example:123",
+    "url": "https://example.factorial.com/job_posting/backend-engineer-123",
+    "location": "Spain"
+  },
+  "link": "https://example.factorialhr.com"
+}

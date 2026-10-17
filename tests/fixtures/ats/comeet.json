@@ -1,0 +1,11 @@
+{
+  "board": "example|22.007",
+  "response": "<script>var COMPANY_POSITIONS_DATA; COMPANY_POSITIONS_DATA = [{\"uid\": \"A1.002\", \"name\": \"Backend Engineer\", \"location\": {\"name\": \"United States\", \"country\": \"US\", \"is_remote\": true}, \"url_comeet_hosted_page\": \"https://www.comeet.com/jobs/example/22.007/backend-engineer/A1.002\", \"custom_fields\": {\"details\": [{\"value\": \"<p>Build Python &amp; Django services.</p>\"}, {\"value\": null}]}, \"time_created\": \"2026-10-16T12:00:00Z\"}];</script>",
+  "detail": null,
+  "expected": {
+    "id": "comeet:example|22.007:A1.002",
+    "url": "https://www.comeet.com/jobs/example/22.007/backend-engineer/A1.002",
+    "location": "United States, US"
+  },
+  "link": "https://www.comeet.com/jobs/example/22.007"
+}
