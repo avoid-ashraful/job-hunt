@@ -32,6 +32,16 @@ LOCATION_HEADER = re.compile(
     r"^(?:available |eligible |allowed )?(?:locations?|countries|regions?|states?|provinces?)\s*:?$", re.I,
 )
 LOCKED, POSITIVE, TIMEZONE, AMBIGUOUS, SILENT = "locked", "positive", "timezone", "ambiguous", "silent"
+ENGLISH_WORDS = frozenset("the and to of a in you we our with for is are will be on as this that".split())
+FUNCTION_WORDS = {lang: frozenset(words.split()) for lang, words in {
+    "fr": "le la les de des du et un une est en pour dans que qui vous nous notre avec sur au aux pas",
+    "de": "der die das und zu den von mit ist ein eine für auf sie wir ihr im dem nicht des bei als",
+    "es": "el la los las de del y en que un una es para con por se su nuestro",
+    "pt": "o a os as de do da dos das e em que um uma é para com por se no na",
+    "it": "il la le di del della e che un una è per con in si sono nel non",
+    "nl": "de het een en van in is op te dat voor met zijn we je",
+    "pl": "i w z na do się jest nie że o to dla od jak",
+}.items()}
 
 
 @dataclass
@@ -41,6 +51,15 @@ class Verdict:
     evidence: str = ""
     place: str = ""
     snippets: list[str] = field(default_factory=list)  # location sentences, for the LLM when ambiguous
+
+
+def reads_english(text: str, lang: str) -> bool:
+    """True when the first 200 words are clearly English, whatever the source's language tag says."""
+    words = re.findall(r"[^\W\d_]+", text.lower())[:200]
+    if len(words) < 40:
+        return False
+    en = sum(w in ENGLISH_WORDS for w in words)
+    return en >= 0.15 * len(words) and en > sum(w in FUNCTION_WORDS.get(lang, ()) for w in words)
 
 
 def _compile(patterns: dict[str, str]) -> dict[str, re.Pattern]:
@@ -240,7 +259,7 @@ class RoleRules:
                 return f"agency.{name}", _around(text, m)
         lang = job.posting_language
         if lang and lang != "en":
-            if not self.english_required.search(text):
+            if not self.english_required.search(text) and not reads_english(text, lang):
                 return f"language.{lang}", "posting is not in English and doesn't ask for English"
         elif len(self.non_latin.findall(text)) > 0.3 * max(1, len(re.findall(r"[A-Za-z]", text))):
             return "language.non_latin", "description is mostly in a non-Latin script"
