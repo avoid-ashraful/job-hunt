@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
+from scanner.learning_outcomes import section as outcome_section
 from scanner.rules import LocationRules, sentences
 
 STOP = set("a an the and or of to in on for with at by from is are be this that our we you your will as it its".split())
@@ -182,11 +183,14 @@ def learn(cfg: dict, store, root: Path, days: int = 7) -> Path:
             out.append(f"- **{label}** `{ref}` {title(job_id) if job_id else ''} (location decided by: {decided or '-'})"
                        + (f": {note}" if note else ""))
     else:
-        out += ["_No feedback yet. Use `scanner feedback <Ref> <label> [note]`._"]
+        out += ["_No feedback yet. Edit a `[ ]` Mark cell in a daily report, then run `scanner sync`._"]
     out += [""]
 
+    outcome_lines, outcome_suggestions = outcome_section(db, since)
+    out += outcome_lines
+
     # 9. suggestions
-    sugg = []
+    sugg = list(outcome_suggestions)
     for rule, c in per_rule.items():
         decided = c["agree"] + c["disagree"]
         if decided >= 5 and c["agree"] / decided < 0.8:

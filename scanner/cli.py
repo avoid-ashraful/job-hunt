@@ -11,6 +11,7 @@ import argparse
 import logging
 import os
 import random
+import tempfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +19,8 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+from scanner.applications import Applications, STATUSES
+from scanner.marks import sync as sync_marks
 from scanner.companies import load_region_map
 from scanner import liveness
 from scanner.dedup import collapse_by_seniority, description_fingerprint, fingerprint
@@ -61,6 +64,10 @@ def load(config_path: Path) -> tuple[dict, Store]:
 
 def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = False) -> Path | None:
     cfg, store = load(config_path)
+    sync_marks(store, ROOT / cfg["output"]["jobs_dir"])
+    apps = Applications(store)
+    apps.ghost_overdue(cfg.get("applications", {}).get("ghosted_after_days", 21))
+    store.commit()
     store.dry_run = dry_run
     now = datetime.now(timezone.utc)
     local_now = datetime.now(ZoneInfo(cfg["candidate"].get("timezone", "UTC")))
@@ -106,7 +113,8 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     # 3b. ghost jobs: reposted, mass-posted, evergreen or re-posted by a third party
     ghost_cfg = cfg["rules"]["ghost"]
-    ghosts = GhostRules(ghost_cfg, lambda j: store.role_history(j, ghost_cfg.get("repost_gap_days", 7)))
+    ghosts = GhostRules(ghost_cfg, lambda j: store.role_history(j, ghost_cfg.get("repost_gap_days", 7)),
+                        apps.silent_count)
     real = []
     for job in new:
         score, signals = ghosts.score(job)
@@ -246,14 +254,18 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     if dry_run:
         store.commit()  # keep LLM cache and logs; nothing is marked as reported
-        for job in kept[:40]:
-            log.info("  %-5s %-26s %-55s %s", job.bucket, job.company[:26], job.title[:55], job.screen.get("decided_by"))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            preview = Path(temp_dir) / "preview.md"
+            write_report(preview, local_now, kept, stats, drop_counts, cfg["candidate"]["country"],
+                         cfg.get("report", {}).get("start_here_limit", 15))
+            print("\n".join(preview.read_text().splitlines()[:35]))
         return None
 
     jobs_dir = ROOT / cfg["output"]["jobs_dir"]
     jobs_dir.mkdir(parents=True, exist_ok=True)
     report = jobs_dir / f"{today}.md"
-    write_report(report, local_now, kept, stats, drop_counts, cfg["candidate"]["country"])
+    write_report(report, local_now, kept, stats, drop_counts, cfg["candidate"]["country"],
+                 cfg.get("report", {}).get("start_here_limit", 15))
     write_drop_log(ROOT / cfg["output"]["state_dir"] / "dropped" / f"{today}.tsv", dropped)
     for job in kept:
         store.mark_reported(job, today)
@@ -294,6 +306,8 @@ def feedback(config_path: Path, ref: str, label: str, note: str) -> None:
     if label not in FEEDBACK_LABELS:
         log.warning("unusual label %r; known labels: %s", label, ", ".join(FEEDBACK_LABELS))
     store.add_feedback(datetime.now(timezone.utc).isoformat(), ref, found[0] if found else None, label, note)
+    if label == "applied" and found:
+        Applications(store).set_status(ref, "applied", note)
     store.commit()
     print(f"saved: {ref} = {label}" + (f" ({found[1]})" if found else " (ref not found in reported jobs; kept anyway)"))
 
@@ -311,6 +325,15 @@ def main() -> None:
     f.add_argument("ref")
     f.add_argument("label")
     f.add_argument("note", nargs="*")
+    sub.add_parser("sync", help="read marks from all daily reports")
+    ap = sub.add_parser("applied", help="record an application by Ref")
+    ap.add_argument("ref")
+    ap.add_argument("note", nargs="*")
+    app = sub.add_parser("app", help="change an application status")
+    app.add_argument("ref")
+    app.add_argument("status", choices=sorted(STATUSES))
+    app.add_argument("note", nargs="*")
+    sub.add_parser("status", help="show application status and response rate")
     lr = sub.add_parser("learn", help="write the self-improvement report from the logs")
     lr.add_argument("--days", type=int, default=7)
     args = parser.parse_args()
@@ -320,8 +343,25 @@ def main() -> None:
         run(args.config, args.dry_run, args.days, args.skip_llm)
     elif args.cmd == "feedback":
         feedback(args.config, args.ref, args.label, " ".join(args.note))
-    elif args.cmd == "learn":
-        from scanner.learn import learn
-
+    elif args.cmd in {"sync", "applied", "app", "status", "learn"}:
         cfg, store = load(args.config)
-        print(learn(cfg, store, ROOT, args.days))
+        saved, parsed = sync_marks(store, ROOT / cfg["output"]["jobs_dir"])
+        apps = Applications(store)
+        apps.ghost_overdue(cfg.get("applications", {}).get("ghosted_after_days", 21))
+        if args.cmd == "sync":
+            print(f"Synced {saved} marks from {parsed} marked or blank cells")
+        elif args.cmd in {"applied", "app"}:
+            status = "applied" if args.cmd == "applied" else args.status
+            try:
+                found = apps.set_status(args.ref, status, " ".join(args.note))
+            except ValueError as exc:
+                parser.error(str(exc))
+            if not found:
+                parser.error(f"unknown Ref: {args.ref}")
+            print(f"{args.ref}: {status}")
+        elif args.cmd == "status":
+            print(apps.summary())
+        else:
+            from scanner.learn import learn
+            print(learn(cfg, store, ROOT, args.days))
+        store.commit()

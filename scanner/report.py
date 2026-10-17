@@ -34,7 +34,7 @@ def _decided_by(sc: dict) -> str:
 
 
 def _table(jobs: list[Job], with_why: bool) -> list[str]:
-    head = "| Ref | Fit | Company | Title | Who can apply | Evidence | Decided by |" + (" Why here |" if with_why else "")
+    head = "| Ref | Mark | Fit | Company | Title | Who can apply | Evidence | Decided by |" + (" Why here |" if with_why else "")
     lines = [head + " Salary | First seen | Apply |", "|" + "---|" * (head.count("|") + 2)]
     for job in sorted(jobs, key=_sort_key):
         sc = job.screen or {}
@@ -47,13 +47,13 @@ def _table(jobs: list[Job], with_why: bool) -> list[str]:
         why_text = "; ".join(x for x in (sc.get("why", ""), sc.get("prior", ""), ghost) if x)
         why = f" {_cell(why_text)} |" if with_why else ""
         lines.append(
-            f"| `{job_ref(job.id)}` | {sc.get('fit', '')}/5 | {_cell(job.company)} | {_cell(job.title)} | {_cell(who)} | "
+            f"| `{job_ref(job.id)}` | [ ] | {sc.get('fit', '')}/5 | {_cell(job.company)} | {_cell(job.title)} | {_cell(who)} | "
             f"{_cell(evidence)} | {_cell(_decided_by(sc))} |{why} {_salary(job)} | {seen} | [apply]({job.url}) |"
         )
     return lines
 
 
-def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, drop_counts: Counter, country: str) -> None:
+def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, drop_counts: Counter, country: str, start_here_limit: int = 15) -> None:
     lines = []
     if path.exists():
         lines.append(f"\n---\n\n## Re-run at {run_at:%H:%M}\n")
@@ -69,7 +69,23 @@ def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, dro
         f"({stats['llm_calls']} AI requests).\n"
     )
 
-    lines.append(f"## ✅ Apply ({len(apply)})\n")
+    picks = sorted(apply, key=_sort_key) + sorted(check, key=_sort_key)[:max(0, start_here_limit - len(apply))]
+    lines.append("Mark a job in its table: `[a]` applied, `[g]` good, `[x]` not eligible, "
+                 "`[e]` eligible, `[r]` not relevant, `[d]` duplicate, `[c]` closed. "
+                 "Add a note inside the brackets, e.g. `[x US only]`. Leave `[ ]` untouched. "
+                 "Jobs in Start here also appear below; mark either copy. If both are marked, Start here wins. "
+                 "Marks sync on the next run or with `uv run python -m scanner sync`.\n")
+    lines.append(f"## Start here ({len(picks)})\n")
+    if picks:
+        lines += ["| Ref | Mark | Tier | Fit | Job |", "|---|---|---|---|---|"]
+        for job in picks:
+            lines.append(f"| `{job_ref(job.id)}` | [ ] | "
+                         f"{'✅ Apply' if job.bucket == 'apply' else '🟡 Check'} | "
+                         f"{job.screen.get('fit', '')}/5 | "
+                         f"[{_cell(job.company)} — {_cell(job.title)}]({job.url}) |")
+    else:
+        lines.append("_No new jobs._")
+    lines.append(f"\n## ✅ Apply ({len(apply)})\n")
     lines.append(f"The posting's own text says someone in {country} can be hired, or only asks for timezone overlap.\n")
     lines += _table(apply, with_why=False) if apply else ["_None today._"]
 
@@ -86,10 +102,6 @@ def write_report(path: Path, run_at: datetime, jobs: list[Job], stats: dict, dro
     for reason, count in drop_counts.most_common():
         lines.append(f"- {count} × {reason}")
     lines.append("\n</details>\n")
-    lines.append(
-        "Feedback helps the scanner learn: `uv run python -m scanner feedback <Ref> <label> [note]` "
-        "with label `applied`, `good`, `not-eligible`, `eligible`, `not-relevant`, `duplicate` or `closed`.\n"
-    )
 
     with path.open("a") as fh:
         fh.write("\n".join(lines) + "\n")

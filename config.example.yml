@@ -178,7 +178,8 @@ rules:
     drop_at: 3
     flag_at: 2
     weights: {freehire_evergreen: 3, fake_freshness: 3, reposted: 2, mass_posted: 1, evergreen_text: 2,
-              scraped_repost: 2, aggregator_source: 1, thin_description: 1}
+              scraped_repost: 2, aggregator_source: 1, thin_description: 1, silent_applications: 1}
+    silent_applications_min: 2  # ghosted applications to a company before its new posts get this signal
     repost_gap_days: 7          # a copy first seen this much earlier counts as a repost, not a concurrent copy
     repost_min: 2               # reposts of one role (company + title) before it counts
     mass_min: 5                 # concurrent copies of one role (often one req in several countries: weak alone)
@@ -248,3 +249,9 @@ llm:
 output:
   jobs_dir: private/jobs
   state_dir: private/state
+
+applications:
+  ghosted_after_days: 21  # mark an unanswered application ghosted after this many days
+
+report:
+  start_here_limit: 15  # show all Apply jobs, then enough top Check jobs to reach this count

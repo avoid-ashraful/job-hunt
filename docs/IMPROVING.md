@@ -14,16 +14,23 @@ Plus `private/state/dropped/<date>.tsv` (every dropped job with its reason) and 
 
 ## Giving feedback (takes seconds, makes the biggest difference)
 
-Each job in the daily list has a **Ref**:
+Each job has a **Mark** cell in the daily Markdown file. Open `private/jobs/YYYY-MM-DD.md` on a phone or laptop and replace `[ ]` with one letter. An optional note goes after a space, inside the brackets.
 
-```bash
-uv run python -m scanner feedback 3fa9c1 applied
-uv run python -m scanner feedback 3fa9c1 not-eligible "they only hire in the US"
-uv run python -m scanner feedback 77b2e0 eligible "was a long shot but they hire globally via Deel"
-uv run python -m scanner feedback 9c01aa not-relevant "mostly frontend"
-```
+| Mark | Meaning |
+|---|---|
+| `[a]` | applied; creates an application |
+| `[g]` | good match |
+| `[x US only]` | not eligible, with a note |
+| `[e]` | eligible, despite the scanner's doubt |
+| `[r]` | not relevant |
+| `[d]` | duplicate |
+| `[c]` | closed |
 
-Labels: `applied`, `good`, `not-eligible`, `eligible`, `not-relevant`, `duplicate`, `closed`.
+The Start here jobs also appear in the full tables. Mark either copy; if both are marked, the Start here mark wins. The next daily scan imports all report marks before filtering. Run `uv run python -m scanner sync` to import them sooner. Re-importing is safe, and changing a mark updates its feedback. A malformed mark is ignored. Clearing a mark back to `[ ]` removes report feedback; an existing application remains in its history.
+
+Use `uv run python -m scanner applied <ref> [note]` if you applied without editing the report. Use `uv run python -m scanner app <ref> interview|rejected|offer|ghosted|withdrawn [note]` as the process changes. `uv run python -m scanner status` lists active applications, days since applying, and the response rate. Applications still at `applied` after `applications.ghosted_after_days` become ghosted. Multiple ghosted applications at one company add a configurable weak signal to future ghost scores.
+
+The optional `scanner feedback <ref> <label> [note]` command still works.
 
 ## The weekly review
 
@@ -40,9 +47,12 @@ Then ask Claude: *"Read the latest learning report and improve the scanner."* Th
 5. **Rule accuracy**: agreement between each rule and the AI spot-checks, with the disagreements listed.
 6. **Ambiguity triggers vs AI verdicts**: a trigger the AI always resolves the same way can become a firm rule, which saves AI calls.
 7. **Uncovered phrases**: recurring wording in AI-decided cases that no rule matches. These are candidate new rules.
-8. **Your feedback**, with the rule that made each decision.
+8. **Your feedback**, with the rule that made each decision, plus marks by rule.
+9. **Application outcomes**: response rates by source, deciding rule and report bucket.
 9. **Suggested actions**, generated from the numbers above.
 
 Improvements are applied by editing `rules:` in `private/config/config.yml` (no code change),
 recording the decision in `private/config/instructions.md`, running `uv run pytest`, and
 comparing a dry run: `uv run python -m scanner run --dry-run --days 3`.
+
+The weekly script is `scripts/weekly-learn.sh`. Install `0 5 * * 6 /home/ubuntu/job_hunt/scripts/weekly-learn.sh` in the UTC server crontab for 11:00 Saturday in Asia/Dhaka.
