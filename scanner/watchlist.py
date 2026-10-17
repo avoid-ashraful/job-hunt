@@ -283,7 +283,8 @@ def _valid_board(session: requests.Session, ats: str, board: str, *args,
         return False
 
 
-ATS_ORDER = ("greenhouse", "ashby", "lever", "workable", "lever_eu", "smartrecruiters",
+# Slug-guess order. No Workable: its apply.workable.com quota (~12h lockout) is shared with the daily scan.
+ATS_ORDER = ("greenhouse", "ashby", "lever", "lever_eu", "smartrecruiters",
              "recruitee", "breezy", "bamboohr", "personio", "teamtailor", "pinpoint")
 
 
