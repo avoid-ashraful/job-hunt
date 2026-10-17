@@ -1,6 +1,8 @@
 """Polite board discovery and cache retries, with no network or real sleeps."""
 
 import json
+import subprocess
+import sys
 from datetime import date
 from email.utils import formatdate
 
@@ -81,6 +83,32 @@ def test_backoff_grows_caps_and_decays(clock):
     for _ in range(9):
         ats._feedback(url, response())
     assert "lever.co" not in ats._BACKOFF
+
+
+def test_missing_slugs_decay_backoff_without_bypassing_current_wait(clock):
+    url = "https://acme.jobs.personio.de/xml"
+    ats._feedback(url, response(429))
+    ats._pace(url)
+    assert clock[0] == 1005
+    ats._feedback(url, response(404))
+    assert ats._BACKOFF["personio.de"] == 2.5
+    ats._pace(url)
+    assert clock[0] == 1010
+    for _ in range(4):
+        ats._feedback(url, response(404))
+    assert "personio.de" not in ats._BACKOFF
+    ats._pace(url)
+    assert clock[0] == 1012.5
+    ats._pace(url)
+    assert clock[0] == 1012.75
+
+
+@pytest.mark.parametrize("code", [403, 429, 500, 503])
+def test_errors_do_not_decay_provider_backoff(code, clock):
+    url = "https://acme.jobs.personio.de/xml"
+    ats._feedback(url, response(429))
+    ats._feedback(url, response(code))
+    assert ats._BACKOFF["personio.de"] >= 5
 
 
 def test_waiting_thread_rechecks_provider_backoff(monkeypatch, clock):
@@ -182,6 +210,34 @@ def test_guess_order_and_normalized_url_deduplication(monkeypatch):
     assert calls.count(("recruitee", "Acme")) == 1
     assert ("recruitee", "acme") not in calls
     assert calls.count(("greenhouse", "acme")) == 1  # URL paths retain case.
+
+
+@pytest.mark.parametrize("company, expected", [
+    ({"company": "Acme Labs", "website": "https://www.acme.io"}, ["acme-labs", "acmelabs", "acme"]),
+    ({"company": "Acme, Inc.", "website": "https://acme.io"}, ["acme", "acmeinc"]),
+    ({"company": "Acme HQ"}, ["acme-hq", "acmehq"]),
+    ({"company": "A", "website": "https://example.com"}, ["example"]),
+])
+def test_slug_variants_keep_name_domain_and_literal_hq(company, expected):
+    assert watchlist._slugs(company) == expected
+
+
+def test_ats_link_scan_handles_large_embedded_tokens():
+    subprocess.run(
+        [sys.executable, "-c", "from scanner.watchlist import _links; assert _links('a' * 100_000) == []"],
+        check=True, timeout=5,
+    )
+
+
+@pytest.mark.parametrize("host, kind", [
+    ("acme.applytojob.com/apply", "jazzhr"), ("acme.homerun.co", "homerun"),
+    ("acme.factorialhr.com", "factorial"), ("acme.workable.com", "workable"),
+    ("acme.recruitee.com", "recruitee"), ("acme.breezy.hr", "breezy"),
+    ("acme.jobs.personio.de", "personio"), ("acme.bamboohr.com", "bamboohr"),
+    ("acme.pinpointhq.com", "pinpoint"), ("acme.teamtailor.com", "teamtailor"),
+])
+def test_subdomain_links_preserve_complete_labels(host, kind):
+    assert watchlist._links(f'<a href="https://{host}">Jobs</a>') == [(kind, "acme")]
 
 
 def seed_file(tmp_path, companies):
