@@ -301,3 +301,50 @@ Use `(run_date, job_id, stage)` to retrieve each reviewed row.
 | R38 | 2026-10-17 | `adp:c968050c-15a9-468b-acaf-b26b765aff76:19000101_000001:9205243098577_1` |
 | R39 | 2026-10-16 | `ashby:alan:583a9a1c-433e-4b76-a1b7-4d9e6a30f1da` |
 | R40 | 2026-10-17 | `torre::8wDa9z9d` |
+
+## Fresh validation
+
+Validated on 2026-10-17 against the fixed auditor labels in L01–L60, with fresh model output rather than replaying historical cached verdicts. Loaded the latest `jobs.payload` through a SQLite `mode=ro` connection and reconstructed `Job` objects. Used the current private configuration and prompt read-only, `LocationRules(cfg['rules']['location']).classify(job).snippets` for the production sentence extraction, and `Screener.screen` followed by `check_evidence`. Forced all sampled jobs through the screener even if today's rules would decide them. No full descriptions or extra context were added to model inputs.
+
+The 60 decision rows represent 56 distinct jobs. Screened each distinct job once per run, in manifest first-occurrence order, in production-sized batches of 20/20/16 with three workers. Reused that fresh result for repeated job/run rows when scoring all 60 decisions. The two runs' extracted inputs were byte-identical. Used separate initially empty caches at `/tmp/job-hunt-validation-19/{initial,final}/cache.sqlite`; no historical verdict was reused. The local harness, input exports, raw results and request counts remain under `/tmp/job-hunt-validation-19/`, outside the repository. Credentials were loaded in place using the scanner's environment/key-file loading, with no `opencode run` calls or private writes.
+
+Both runs used the unmodified configured production chain: `orca:deepseek/deepseek-v4-flash-free`, then `orca:z-ai/glm-5.3-flash-free`, then `gemini:gemini-flash-latest`. Both free models returned HTTP 429 for every attempt; all 56 successful job results per run came from `gemini-flash-latest`. Later fallbacks (`gemini-3.5-flash`, Claude Sonnet) were not reached. Runtime prompt hash: `b499203ccfd0`. Each run made nine screener calls (six failed free-model calls, three successful Gemini batches), comprising 33 HTTP requests (30 rate-limited attempts, three successful requests). **Total: 18 screener calls, 66 HTTP requests, six successful LLM responses.**
+
+Precision below means correct labels divided by predictions of that outcome in that run; denominators change as predictions change. Overall is exact-label accuracy across the same 60 decision rows. There were no `includes_candidate` predictions in any run.
+
+| Predicted outcome | Historical before safeguards | Fresh safeguards, before header fix | Fresh rerun, final guard |
+| --- | ---: | ---: | ---: |
+| anywhere | 6/14 (42.9%) | 5/6 (83.3%) | 5/7 (71.4%) |
+| region_locked | 12/20 (60.0%) | 11/15 (73.3%) | 11/11 (100%) |
+| work_authorization_required | 4/7 (57.1%) | 4/4 (100%) | 4/4 (100%) |
+| unclear | 7/12 (58.3%) | 21/30 (70.0%) | 25/35 (71.4%) |
+| timezone_only | 5/7 (71.4%) | 5/5 (100%) | 3/3 (100%) |
+| includes_candidate | — (0) | — (0) | — (0) |
+| **Overall** | **34/60 (56.7%)** | **46/60 (76.7%)** | **48/60 (80.0%)** |
+
+### Small general fix and one fresh rerun
+
+The first fresh run still locked L16/L17/L19/L22 using only `Location:` / `Location(s):` headers copied from the body. Extended `check_evidence` to treat those headers as labels even when they occur verbatim in the description. Headers containing an explicit hiring/role statement remain usable, preserving L24's actual EMEA role requirement. Added anonymized regression cases for plain, Markdown and plural headers and for an explicit role statement. No prompt, configuration, sentence extraction or dependency changes were made.
+
+Applying the final guard to the first run's saved raw outputs changes exactly those four erroneous locks to `unclear`: 50/60 (83.3%). Then performed one complete fresh model rerun with a separate empty cache, and applied the final guard to its collected raw outputs. Its result is 48/60 (80.0%). The four header errors remain fixed, but L52/L53 newly misclassify timezone-only permission. Thus the observed fresh gain is 14 correct rows versus history (+23.3 percentage points); the isolated guard replay gains four rows, while variation between fresh model responses loses two. Temperature zero did not produce identical responses. This remains validation on the existing stratified audit set, not an independent holdout or an estimate of population precision.
+
+### Every remaining error in the fresh rerun
+
+| ID | Final label | Auditor label | One-line reason |
+| --- | --- | --- | --- |
+| L10 | unclear | anywhere | Extraction supplies only “Work anywhere”; the full-body removal of country/region limits is absent. |
+| L25 | unclear | region_locked | Extraction retains the Spain label but omits the country-of-employment remote policy supporting the restriction. |
+| L28 | unclear | region_locked | UAE candidate scope conflicts with a US/UK/CAN label; the model abstains although both scopes exclude Bangladesh. |
+| L30 | unclear | region_locked | Extraction retains only a Canada label and omits the explicit Alberta-only residence requirement. |
+| L39 | unclear | region_locked | The multiline Available Locations list is absent; the supplied snippet concerns the company's charitable program. |
+| L40 | unclear | work_authorization_required | The explicit US work-authorization sentence is absent from extracted input. |
+| L41 | unclear | region_locked | Extraction supplies relocation assistance but omits the rejection of fully remote candidates. |
+| L44 | anywhere | unclear | The model treats salary benchmarking outside three countries as worldwide permission; the external allowed-country scope is absent. |
+| L46 | unclear | region_locked | Extraction supplies team distribution but omits the full-body “anywhere in SA” role restriction. |
+| L48 | unclear | work_authorization_required | Extraction supplies EU hours and a location label but omits mandatory UK/EU work authorization. |
+| L52 | unclear | timezone_only | The model chooses anywhere for explicit IST overlap; the bare-anywhere guard then downgrades its quote to unclear. |
+| L53 | anywhere | timezone_only | The model chooses anywhere despite explicit Eastern Time overlap; the auditor's exact label is timezone_only. |
+
+The first fresh run's complete error list was L10/L16/L17/L19/L22/L25/L28/L30/L39/L40/L41/L44/L46/L48. Reasons for the ten errors shared with the rerun are listed above; L16/L17/L19/L22 were unsupported locks from bare body location headers. Neither run had missing job results. Eight final errors involve decisive text absent from the production snippets; further prompt tuning cannot reconstruct that text. L52 remains Check after the guard; L53 incorrectly asserts positive permission instead of retaining the timezone-only label.
+
+Validation: `uv run pytest -q` — **479 passed**. Backlog row 19 marked `done (branch)`. No private files changed; no push.
