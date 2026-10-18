@@ -307,3 +307,12 @@ def test_watchlist_website_reaches_hq_lookup_but_job_links_do_not(monkeypatch):
     job.ats_metadata["company_website"] = "https://news.ycombinator.com/item?id=1"
     company_evidence.lookup(job)
     assert not any("ycombinator" in u for u in fetched)
+
+
+def test_watchlist_hq_is_used_when_no_better_evidence():
+    job = Job(id="ashby:acme:1", source="ats", url="https://jobs.ashbyhq.com/acme/1", title="t", company="Acme",
+              company_key="acme", description="Python", ats_metadata={"watchlist_hq": "SG"})
+    assert CompanyProfiles(sqlite3.connect(":memory:")).resolve(job)[0] == "sg"
+    plain = Job(id="ashby:other:1", source="ats", url="https://jobs.ashbyhq.com/other/1", title="t", company="Other",
+                company_key="other", description="Python")
+    assert CompanyProfiles(sqlite3.connect(":memory:")).resolve(plain)[0] is None

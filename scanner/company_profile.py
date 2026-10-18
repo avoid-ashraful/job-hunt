@@ -133,6 +133,8 @@ class CompanyProfiles:
             "SELECT hq_country, evidence, source, strength FROM company_profiles WHERE company_key = ?", (key,)
         ).fetchone()
         found = _candidate(job, self.cfg)
+        if not found[0] and (hq := str((job.ats_metadata or {}).get("watchlist_hq") or "").lower()):
+            found = (hq, "watchlist entry (seed list or remoteintech)", "watchlist", 3)
         if key in self.vendor:
             vendor = self.vendor[key]
             if vendor[3] > found[3]:
