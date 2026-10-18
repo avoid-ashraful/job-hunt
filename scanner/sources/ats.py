@@ -279,7 +279,9 @@ def _location_tags(location: str, cfg: dict) -> tuple[list[str], list[str]]:
     if re.search(patterns.get("global", r"\b(global|worldwide|anywhere)\b"), location, re.I):
         return ["global"], []
     regions = [name for name, pat in (patterns.get("regions") or {}).items() if re.search(pat, location, re.I)]
-    countries = [code for code, pat in (patterns.get("countries") or {}).items() if re.search(pat, location, re.I)]
+    # YAML 1.1 reads an unquoted `no:` (Norway) key as False
+    countries = ["no" if code is False else code for code, pat in (patterns.get("countries") or {}).items()
+                 if re.search(pat, location, re.I)]
     for code in countries:
         region = (patterns.get("country_regions") or {}).get(code)
         if region and region not in regions:

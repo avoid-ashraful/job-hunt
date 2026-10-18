@@ -60,7 +60,7 @@ sources:
         se: '\b(sweden)\b'
         dk: '\b(denmark)\b'
         fi: '\b(finland)\b'
-        no: '\b(norway)\b'
+        'no': '\b(norway)\b'  # quoted: YAML reads a bare no as false
         at: '\b(austria)\b'
         be: '\b(belgium)\b'
         cz: '\b(czech(?:ia| republic))\b'
