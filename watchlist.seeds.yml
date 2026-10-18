@@ -289,3 +289,66 @@ companies:
     no_board: true
     website: https://www.yonder.io
     why: 'no public board; teamtailor yonder belonged to Yonder (yonder.com, UK credit card). yonder.io now redirects to a domain-for-sale page'
+  # Backlog 32 (2026-10-18): APAC-HQ companies hiring engineers remotely across Asia; boards verified live.
+  - company: Mobbin
+    website: https://mobbin.com
+    ats: ashby
+    board: mobbin.com
+    hq_country: sg
+    why: 'Software Engineer posting located "Remote (±3 hours from UTC+8)", i.e. UTC+5 to UTC+11: https://jobs.ashbyhq.com/mobbin.com/e35d036f-9054-43b5-9d80-a0a3a5e89f39'
+  - company: Airalo
+    website: https://www.airalo.com
+    ats: lever
+    board: airalo
+    hq_country: sg
+    why: '"Fully remote by design, genuinely global", team across 60+ countries; remote APAC tech roles (Solutions Architect, APAC): https://jobs.lever.co/airalo/ddae0c29-30d8-482b-966e-2a13c07786b1'
+  - company: Toku
+    website: https://toku.co
+    ats: recruitee
+    board: tokultd
+    hq_country: sg
+    why: 'Singapore cloud-comms company with remote engineering roles in Malaysia and India (Senior Software Engineer, Distributed Systems, remote): https://careers.toku.co/o/senior-software-engineer-distributed-systems'
+  - company: CoverGo
+    website: https://covergo.com
+    ats: workable
+    board: covergo
+    hq_country: hk
+    why: 'Insurance SaaS; covergo.com/careers links apply.workable.com/covergo, "Fully Remote" engineers in Pakistan, Nepal, Vietnam: https://apply.workable.com/j/68047B2E64'
+  - company: Cliniko
+    website: https://www.cliniko.com
+    ats: workable
+    board: cliniko
+    hq_country: au
+    why: 'Fully remote practice-management SaaS (Melbourne); cliniko.com links apply.workable.com/cliniko; Rails developer roles "Remote, Worldwide" / "Australia and New Zealand, Asia": https://jobs.rubyonrails.org/jobs/17154-full-stack-developer-for-a-unique-company-cliniko'
+  - company: TableCheck
+    website: https://www.tablecheck.com
+    ats: teamtailor
+    board: tablecheck
+    hq_country: jp
+    why: 'Tokyo restaurant-booking SaaS, remote-first, "open to remote candidates who do not plan to relocate" (overlap with JST hours); no engineering opening right now: https://www.tokyodev.com/companies/tablecheck'
+  - company: Atria
+    website: https://tryatria.com
+    ats: ashby
+    board: atria
+    why: 'Singapore-based AI ad-creative startup (US Inc.); Senior Backend Engineer (Python) remote, "APAC time zones are preferred": https://jobs.ashbyhq.com/atria/575db722-b864-4c72-9461-92b9a37c39e9'
+  - company: LottieFiles
+    website: https://lottiefiles.com
+    ats: bamboohr
+    board: lottiefiles
+    why: 'Malaysia-founded (Design Barn Inc.); Senior Platform Engineer "Fully Remote Working Environment", no country limit: https://lottiefiles.bamboohr.com/careers/141'
+  - company: qlub
+    website: https://qlub.io
+    ats: ashby
+    board: qlub
+    hq_country: ae
+    why: 'Dubai restaurant-payments company; remote Senior Software Engineer in Colombo, Sri Lanka (South Asia): https://jobs.ashbyhq.com/qlub/cb15ed05-573c-4f78-99e4-49e1cff92d6f'
+  - company: Radian Arc
+    website: https://radianarc.com
+    ats: greenhouse
+    board: radianarc
+    why: 'Australian GPU cloud (now part of Submer InferX); Staff Storage Platform Engineer "fully remote ... all locations", APAC support roles as "Contractor or Employee of Record": https://job-boards.eu.greenhouse.io/radianarc/jobs/4875788101'
+  - company: Twelve Data
+    no_board: true
+    website: https://twelvedata.com
+    hq_country: sg
+    why: 'no public board; jobs on own site. Singapore market-data API (Pte. Ltd.); "Senior Software Engineer, Backend: Remote" and "DevOps Engineer, APAC region: Remote": https://twelvedata.com/careers/senior-software-engineer-backend'
