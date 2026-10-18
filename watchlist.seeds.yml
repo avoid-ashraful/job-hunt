@@ -352,3 +352,7 @@ companies:
     website: https://twelvedata.com
     hq_country: sg
     why: 'no public board; jobs on own site. Singapore market-data API (Pte. Ltd.); "Senior Software Engineer, Backend: Remote" and "DevOps Engineer, APAC region: Remote": https://twelvedata.com/careers/senior-software-engineer-backend'
+  - company: Amazon
+    website: https://www.amazon.jobs
+    no_board: true
+    why: Amazon hires through its own amazon.jobs site; the guessed Workable account "amazon" is not Amazon's
