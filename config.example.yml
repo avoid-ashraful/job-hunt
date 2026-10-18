@@ -79,7 +79,7 @@ sources:
         id: '\b(indonesia)\b'
         th: '\b(thailand)\b'
         br: '\b(brazil)\b'
-        mx: '\b(mexico)\b'
+        mx: '(?<!new )\b(mexico)\b'  # not the US state New Mexico
         ar: '\b(argentina)\b'
         co: '\b(colombia)\b'
         cl: '\b(chile)\b'

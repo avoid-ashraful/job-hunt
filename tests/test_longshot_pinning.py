@@ -52,3 +52,12 @@ def test_norway_is_a_country_code_not_yaml_false():
     assert ats._location_tags("Remote - Norway", {"location_patterns": patterns}) == ([], ["no"])
     cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
     assert all(isinstance(code, str) for code in cfg["sources"]["ats"]["location_patterns"]["countries"])
+
+
+@pytest.mark.parametrize("location, countries", [
+    ("Florida - Remote, New Mexico - Remote, Idaho - Remote", []),  # US states, not Mexico (a Salesforce posting)
+    ("Mexico City, Mexico", ["mx"]),
+])
+def test_new_mexico_is_not_mexico(location, countries):
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())["sources"]["ats"]
+    assert ats._location_tags(location, cfg)[1] == countries
