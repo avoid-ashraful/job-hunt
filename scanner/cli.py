@@ -141,7 +141,7 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         source_cfg["ats"] = {**source_cfg["ats"], "filters": cfg["filters"], "watchlist_file": str(watch_path),
                              "health_dir": str(ROOT / cfg["output"]["state_dir"] / "watchlist_health")}
     denied = {str(c).lower() for c in watch_cfg.get("hq_deny_countries", ["in", "bd"])}
-    watched = [c for c in watchlist.list_entries(watch_path) if c.get("status") != "inactive" and str(c.get("hq_country") or "").lower() not in denied]
+    watched = [c for c in watchlist.list_entries(watch_path) if c.get("board") and c.get("status") != "inactive" and str(c.get("hq_country") or "").lower() not in denied]
     watched_keys = {watchlist.normalize_company(c["company"]) for c in watched}
     watched_boards = {(c.get("ats"), c.get("board")) for c in watched}
     source_stats = []

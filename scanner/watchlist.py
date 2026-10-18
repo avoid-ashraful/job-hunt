@@ -563,7 +563,7 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
                 clean_name = str(s["company"]).rstrip("> \t\r\n").strip()
                 matching = next((seed for seed in seeds if normalize_company(seed["company"]) == normalize_company(clean_name)), None)
                 if matching is not None:
-                    matching.update({k: s[k] for k in ("ats", "board", "aliases", "website") if k in s})
+                    matching.update({k: s[k] for k in ("ats", "board", "aliases", "website", "no_board") if k in s})
                 if normalize_company(clean_name) not in existing_keys:
                     seeds.append({
                         "company": clean_name,
@@ -573,7 +573,7 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
                         "hires": "worldwide",
                         "source": "seeds_yml",
                         "why": s.get("why", ""),
-                        **{k: s[k] for k in ("ats", "board", "aliases") if k in s},
+                        **{k: s[k] for k in ("ats", "board", "aliases", "no_board") if k in s},
                     })
                     existing_keys.add(normalize_company(clean_name))
 
@@ -685,6 +685,12 @@ def build(vendor_dir: Path, watchlist_file: Path, cache_dir: Path, *, workers: i
         if seed["hq_country"] in deny_countries:
             stats["excluded_hq"] += 1
             by_key.pop(key, None)
+            continue
+
+        if seed.get("no_board"):  # checked by hand: no public board, and guessing finds another company's
+            stats["no_board"] = stats.get("no_board", 0) + 1
+            # Kept without a board so `grow` doesn't re-add the wrong board from old jobs.
+            by_key[key] = {k: v for k, v in _seed_fields(seed).items() if k not in ("ats", "board")} | {"status": "no_board"}
             continue
 
         override = bool(seed.get("ats") and seed.get("board"))

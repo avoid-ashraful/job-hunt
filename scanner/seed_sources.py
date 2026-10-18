@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import io
 import re
 import zipfile
@@ -24,6 +26,8 @@ REMOTEINTECH_URL = "https://codeload.github.com/remoteintech/remote-jobs/zip/ref
 LINK = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
 QUALITY = re.compile(r"\b(?:agenc\w*|staffing|outsourc\w*|crowdsourc\w*|outstaff\w*|marketplace|consultanc\w*|consulting|freelancer\w*|talent network|recruitment company|software house)\b", re.I)
 REGIONS = {"worldwide", "anywhere", "asia", "apac", "asia-pacific", "asia pacific", "bangladesh"}
+
+log = logging.getLogger(__name__)
 
 
 def _eligible(seed: dict, evidence: str, cfg: dict) -> bool:
@@ -124,6 +128,8 @@ def merge_seeds(existing: list[dict], incoming: list[dict], reserved: list[dict]
         for seed in batch:
             key = normalize_company(seed["company"])
             if not key or key in keys:
+                if key and not is_new and not reserved:
+                    log.warning("seed %r is listed twice in the hand seeds; only the first entry is used", seed["company"])
                 continue
             keys.add(key)
             merged.append(seed)

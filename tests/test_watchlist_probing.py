@@ -533,3 +533,23 @@ def test_thread_waiting_in_pace_sees_a_new_block(monkeypatch, clock):
     session = Session()
     got = ats._request(session, url)
     assert got.status_code == 429 and got.url == url and session.calls == []
+
+
+def test_no_board_seed_removes_a_wrong_board_and_blocks_regrowth(tmp_path, monkeypatch):
+    import sqlite3
+
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    (vendor / "acme.md").write_text('---\ntitle: Acme\nregion: worldwide\n---\n')
+    seeds = seed_file(tmp_path, [{"company": "Acme", "no_board": True, "why": "board belongs to Acme Robotics"}])
+    path = tmp_path / "watch.yml"
+    path.write_text(yaml.safe_dump({"companies": [{"company": "Acme", "ats": "ashby", "board": "acme"}]}))
+    monkeypatch.setattr(watchlist, "resolve_company", lambda *a, **k: pytest.fail("must not guess"))
+    watchlist.build(vendor, path, tmp_path / "cache", seeds_file=seeds)
+    entry = watchlist.list_entries(path)[0]
+    assert entry["status"] == "no_board" and "board" not in entry
+    db = sqlite3.connect(":memory:")
+    db.executescript("CREATE TABLE jobs(id TEXT, payload TEXT); CREATE TABLE decisions(job_id TEXT, outcome TEXT, stage TEXT);"
+                     "CREATE TABLE feedback(job_id TEXT, label TEXT);")
+    db.execute("INSERT INTO jobs VALUES (?, ?)", ("ashby:acme:1", json.dumps({"company": "Acme", "regions": ["global"]})))
+    assert watchlist.grow(db, path)["added"] == 0
