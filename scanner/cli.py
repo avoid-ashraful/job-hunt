@@ -275,6 +275,13 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
 
     # 7. buckets: clear eligibility + good fit = Apply; everything else kept = Check
     min_fit = cfg["rules"]["role"].get("min_fit_for_apply", 3)
+    ok_tags = set(cfg["candidate"].get("tag_regions_ok", ["global"]))
+    code = cfg["candidate"].get("country_code", "").lower()
+
+    def pinned(job: Job) -> bool:
+        """The employer's own board names countries/regions that leave the candidate out."""
+        return job.source == "ats" and "global" not in job.regions and bool(
+            (job.countries and code not in job.countries) or (job.regions and not ok_tags & set(job.regions)))
     apply_evidence = ApplyEvidence(cfg["rules"].get("apply_evidence", {}))
     evidence_demotions = 0
     for job in eligible:
@@ -284,8 +291,10 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
             job.screen["why"] = "eligible, but may be a ghost posting"
         elif job.screen["fit"] >= min_fit:
             if reason := apply_evidence.weak_reason(job):
-                job.bucket = "check"
+                job.bucket = "longshot" if pinned(job) else "check"
                 job.screen["why"] = f"eligible, but evidence is weak: {reason}"
+                if pinned(job):
+                    job.screen["why"] += f"; employer lists {', '.join(job.countries or job.regions)} only"
                 evidence_demotions += 1
                 store.log_decision(today, job.id, "apply_evidence", "weak_evidence", "check", job.screen["why"])
             else:
@@ -296,8 +305,6 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
     # Check is split: tags compatible with the candidate (or a company known to hire worldwide)
     # stay in Check; jobs whose only signal is a region tag that excludes the candidate are long shots.
     priors = load_region_map(ROOT / cfg["candidate"].get("company_priors", "vendor/remote-jobs/src/companies"))
-    ok_tags = set(cfg["candidate"].get("tag_regions_ok", ["global"]))
-    code = cfg["candidate"].get("country_code", "").lower()
     for job in check:
         prior = priors.get(job.company_key)
         if prior:
@@ -305,11 +312,9 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
         # a region tag like apac is compatible, unless the source pinned it to other countries (apac + India)
         tag_ok = "global" in job.regions or (ok_tags & set(job.regions) and (not job.countries or code in job.countries))
         # The employer's own board naming other countries outranks a company-level "hires worldwide" prior.
-        pinned = job.source == "ats" and "global" not in job.regions and (
-            (job.countries and code not in job.countries) or (job.regions and not ok_tags & set(job.regions)))
-        if not pinned and (prior == "worldwide" or not job.regions or tag_ok):
+        if not pinned(job) and (prior == "worldwide" or not job.regions or tag_ok):
             job.bucket = "check"
-        elif pinned:
+        elif pinned(job):
             job.bucket = "longshot"
             where = ", ".join(job.countries or job.regions)
             job.screen["why"] = (job.screen.get("why", "") + f"; employer lists {where} only").lstrip("; ")

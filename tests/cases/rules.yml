@@ -568,3 +568,9 @@
     title: Senior Developer Success Engineer - West
   expected:
     outcome: drop
+- name: engineering-leader-is-a-manager-role
+  stage: filter
+  job:
+    title: Engineering Leader, Platform Engineering
+  expected:
+    outcome: drop

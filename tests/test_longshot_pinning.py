@@ -86,3 +86,25 @@ def test_untagged_sources_get_tags_from_their_location_text(tmp_path, monkeypatc
     monkeypatch.setattr(cli.LocationRules, "classify", lambda self, job: Verdict("silent", "silent"))
     cli.run(config, dry_run=False, days=3, skip_llm=True)
     assert job.bucket == expected
+
+
+@pytest.mark.parametrize("countries,expected", [(["us", "ca"], "longshot"), ([], "check")])
+def test_weak_evidence_demotion_respects_employer_pinned_countries(tmp_path, monkeypatch, countries, expected):
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
+    cfg["sources"] = {"freehire": {"first_run_days": 3}}
+    cfg["output"] = {"jobs_dir": "jobs", "state_dir": "state"}
+    cfg["liveness"]["enabled"] = False
+    config = tmp_path / "config.yml"
+    config.write_text(yaml.safe_dump(cfg))
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli.CompanyProfiles, "enrich_report", lambda self, jobs: None)
+    job = Job(id="greenhouse:acme:1", source="ats", url="https://job-boards.greenhouse.io/acme/jobs/1",
+              title="Senior Python Engineer", company="Acme", company_key="acme",
+              description="Work from anywhere with flexible hours.\n" + "Build Python Django PostgreSQL Redis services. " * 20,
+              location="Remote, Canada; Remote, United States", countries=countries, watchlist=True,
+              first_seen_at=datetime.now(timezone.utc))
+    monkeypatch.setattr(cli.sources, "fetch_all", lambda *args: iter([job]))
+    monkeypatch.setattr(cli.LocationRules, "classify",
+                        lambda self, job: Verdict("positive", "test.positive", "Work from anywhere with flexible hours"))
+    cli.run(config, dry_run=False, days=3, skip_llm=True)
+    assert job.bucket == expected
