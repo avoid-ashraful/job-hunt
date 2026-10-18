@@ -71,7 +71,10 @@ def _tokens(name: str) -> list[str]:
 
 def _domain(url: str) -> str:
     host = (urlparse(url if "//" in url else f"//{url}").hostname or "").removeprefix("www.")
-    return ".".join(host.split(".")[-2:]) if host else ""
+    parts = host.split(".")
+    # shortcut: two-letter-TLD second levels (co.uk, com.tr, com.au); a public-suffix list if this misjudges
+    keep = 3 if len(parts) > 2 and len(parts[-1]) == 2 and parts[-2] in {"co", "com", "org", "net", "ac", "gov", "edu"} else 2
+    return ".".join(parts[-keep:]) if host else ""
 
 
 def names_match(owner: str, company: str) -> bool:

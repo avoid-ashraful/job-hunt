@@ -154,3 +154,14 @@ class FixtureSession:
 ])
 def test_same_name_company_with_another_domain_is_not_ours(name, kind, board, company, website, ours):
     assert owns(FixtureSession(name), kind, board, company, website) is ours
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("https://www.firstpoint.com.tr/careers", "firstpoint.com.tr"),
+    ("https://jobs.example.co.uk", "example.co.uk"),
+    ("https://careers.ghost.org/", "ghost.org"),
+    ("https://kraken.tech", "kraken.tech"),
+    ("acme.io", "acme.io"),
+])
+def test_domain_keeps_second_level_country_suffixes(url, expected):
+    assert board_owner._domain(url) == expected
