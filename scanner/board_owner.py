@@ -132,6 +132,8 @@ def owns(session: requests.Session, ats: str, board: str, company: str, website:
     if resp is None or resp.status_code == 429 or resp.status_code >= 500:
         return None
     site, final = _domain(website), _domain(resp.url)
+    if site.endswith(ATS_DOMAINS + AGGREGATORS):  # a DB-evidence seed's "website" is the job link it came from
+        site = ""
     wanted = "".join(_tokens(company))
     if final and not any(final.endswith(d) for d in ATS_DOMAINS):
         # The board forwards to a careers site: the company that set up the redirect owns the board.

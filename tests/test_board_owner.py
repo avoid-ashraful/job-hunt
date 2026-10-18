@@ -151,6 +151,9 @@ class FixtureSession:
     ("spotify", "lever", "spotify", "Spotify", "https://www.spotify.com/", True),  # spotifyjobs.com
     ("cabify", "greenhouse", "cabify", "Cabify", "https://cabify.com/", True),  # cabify.careers
     ("bandlab", "pinpoint", "bandlab", "BandLab", "https://bandlab.com/", True),  # bandlabtechnologies.com
+    # a DB-evidence seed's "website" is the job link it was found on, which names no owner
+    ("railway", "ashby", "railway", "Railway", "https://himalayas.app/companies/railway/jobs/backend-engineer", True),
+    ("railway", "ashby", "railway", "Railway", "https://news.ycombinator.com/item?id=49532898", True),
 ])
 def test_same_name_company_with_another_domain_is_not_ours(name, kind, board, company, website, ours):
     assert owns(FixtureSession(name), kind, board, company, website) is ours

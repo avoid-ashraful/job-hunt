@@ -529,6 +529,20 @@
   expected:
     outcome: drop
     rule: title excluded
+- name: compound_title-comma-manager-qualifier-dropped
+  stage: filter
+  job:
+    title: Manager, Applied AI Architect (India)
+  expected:
+    outcome: drop
+    rule: title excluded
+- name: compound_title-comma-director-qualifier-dropped
+  stage: filter
+  job:
+    title: Software Engineer, Director
+  expected:
+    outcome: drop
+    rule: title excluded
 - name: api-title-needs-a-role-noun
   stage: filter
   job:

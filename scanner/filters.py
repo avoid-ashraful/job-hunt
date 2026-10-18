@@ -24,7 +24,8 @@ def _first(patterns: list[re.Pattern], text: str) -> re.Match | None:
 
 # Role separators split a title only when both sides name a role, so "Senior Engineer, Payments" stays whole.
 _ROLE_SEP = re.compile(r"( [|/·] |; |, | & )")
-_ROLE_NOUN = re.compile(r"\b(engineer|developer|architect|programmer|manager|director|designer|scientist|analyst)s?\b", re.I)
+_IC_NOUN = re.compile(r"\b(engineer|developer|architect|programmer|designer|scientist|analyst)s?\b", re.I)
+_ROLE_NOUN = re.compile(rf"{_IC_NOUN.pattern}|\b(manager|director)s?\b", re.I)
 
 
 def _role_segments(title: str) -> list[str]:
@@ -32,7 +33,9 @@ def _role_segments(title: str) -> list[str]:
     parts = _ROLE_SEP.split(title)
     segments = [parts[0]]
     for sep, part in zip(parts[1::2], parts[2::2]):
-        if _ROLE_NOUN.search(segments[-1]) and _ROLE_NOUN.search(part):
+        # after a comma, "Manager"/"Director" qualifies the role ("Manager, AI Architect") rather than listing another
+        noun = _IC_NOUN if sep == ", " else _ROLE_NOUN
+        if noun.search(segments[-1]) and noun.search(part):
             segments.append(part)
         else:
             segments[-1] += sep + part

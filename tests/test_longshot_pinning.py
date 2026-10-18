@@ -44,3 +44,20 @@ def test_employer_listed_countries_make_a_silent_job_a_long_shot(tmp_path, monke
     monkeypatch.setattr(cli.LocationRules, "classify", lambda self, job: Verdict("silent", "silent"))
     cli.run(config, dry_run=False, days=3, skip_llm=True)
     assert job.bucket == expected
+
+
+def test_norway_is_a_country_code_not_yaml_false():
+    # An unquoted `no:` key loads as False; a Norway-tagged long shot then crashed ", ".join(job.countries).
+    patterns = yaml.safe_load("countries:\n  no: '\\bnorway\\b'\n")
+    assert ats._location_tags("Remote - Norway", {"location_patterns": patterns}) == ([], ["no"])
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
+    assert all(isinstance(code, str) for code in cfg["sources"]["ats"]["location_patterns"]["countries"])
+
+
+@pytest.mark.parametrize("location, countries", [
+    ("Florida - Remote, New Mexico - Remote, Idaho - Remote", []),  # US states, not Mexico (a Salesforce posting)
+    ("Mexico City, Mexico", ["mx"]),
+])
+def test_new_mexico_is_not_mexico(location, countries):
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())["sources"]["ats"]
+    assert ats._location_tags(location, cfg)[1] == countries

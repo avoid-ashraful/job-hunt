@@ -335,7 +335,6 @@ def resolve_company(company: dict, session: requests.Session | None = None,
         trusted: set[tuple[str, str]] = set()
         seen: set[str] = set()
         aliases = company.get("aliases") or []
-        owner_website = "" if _domain(cweb).endswith(AGGREGATORS) else cweb
 
         def probe(ats, board, reason, trust=False):
             url = normalize_url(_base(ats, board)[0])
@@ -351,7 +350,7 @@ def resolve_company(company: dict, session: requests.Session | None = None,
                 return None
             if not trust:
                 try:
-                    owner = owns(session, ats, board, cname, owner_website, aliases=aliases, raise_on_limit=True)
+                    owner = owns(session, ats, board, cname, cweb, aliases=aliases, raise_on_limit=True)
                 except requests.HTTPError as exc:
                     if exc.response is not None and exc.response.status_code == 429:
                         unresolved.add((ats, board))
