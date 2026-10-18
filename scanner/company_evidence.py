@@ -173,7 +173,7 @@ def lookup(job: Job) -> tuple[str | None, str]:
         session.headers["User-Agent"] = "job-hunt-scanner (personal use)"
         metadata = job.ats_metadata or {}
         website = metadata.get("company_website") or metadata.get("website") or ""
-        if website and _domain(website).endswith(ATS_DOMAINS + AGGREGATORS):  # a seed's "website" can be a job link
+        if website and _domain(website) in ATS_DOMAINS + AGGREGATORS:  # a seed's "website" can be a job link
             website = ""
         identity = _ats_identity(job)
         parts = job.id.split(":", 2)

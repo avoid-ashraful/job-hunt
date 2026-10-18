@@ -424,7 +424,7 @@ def resolve_company(company: dict, session: requests.Session | None = None,
 
         # 2. Check candidate boards found in HTML (careers link / embed). A link on a page that lists many
         #    companies (an HN thread, an aggregator) is just a guess and must pass the ownership check.
-        shared_page = any(_domain(u).endswith(AGGREGATORS) for u in filter(None, (careers_url, website)))
+        shared_page = any(_domain(u) in AGGREGATORS for u in filter(None, (careers_url, website)))
         for ats, board in dict.fromkeys(links):
             result = probe(ats, board, "verified slug" if shared_page else "careers link", not shared_page)
             if result:

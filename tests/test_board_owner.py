@@ -168,3 +168,8 @@ def test_same_name_company_with_another_domain_is_not_ours(name, kind, board, co
 ])
 def test_domain_keeps_second_level_country_suffixes(url, expected):
     assert board_owner._domain(url) == expected
+
+
+def test_not_owner_list_matches_whole_domains_only():
+    page = '<a href="https://www.netflix.com/about">About</a> <a href="https://x.com/acme">X</a>'
+    assert board_owner.linked_domains(page) == {"netflix.com"}  # x.com is excluded; netflix.com merely ends in "x.com"

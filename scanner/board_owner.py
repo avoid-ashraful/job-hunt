@@ -97,7 +97,7 @@ def _mentions(page: str, site: str) -> bool:
 
 def linked_domains(page: str) -> set[str]:
     """Company domains the board links to as its own (website, apply email), minus ATS/social/CDN hosts."""
-    return {d for m in LINKED.finditer(page) for h in m.groups() if h and (d := _domain(h)) and not d.endswith(NOT_OWNERS)}
+    return {d for m in LINKED.finditer(page) for h in m.groups() if h and (d := _domain(h)) and d not in NOT_OWNERS}
 
 
 def _same_owner(session: requests.Session, domain: str, site: str) -> bool | None:
@@ -132,10 +132,10 @@ def owns(session: requests.Session, ats: str, board: str, company: str, website:
     if resp is None or resp.status_code == 429 or resp.status_code >= 500:
         return None
     site, final = _domain(website), _domain(resp.url)
-    if site.endswith(ATS_DOMAINS + AGGREGATORS):  # a DB-evidence seed's "website" is the job link it came from
+    if site in ATS_DOMAINS + AGGREGATORS:  # a DB-evidence seed's "website" is the job link it came from
         site = ""
     wanted = "".join(_tokens(company))
-    if final and not any(final.endswith(d) for d in ATS_DOMAINS):
+    if final and final not in ATS_DOMAINS:
         # The board forwards to a careers site: the company that set up the redirect owns the board.
         labels = {re.sub(r"[^a-z0-9]", "", x) for x in (urlparse(resp.url).hostname or "").lower().split(".")}
         return final == site or (len(wanted) >= 4 and wanted in labels)  # careers.godaddy, not prismanet.nl
