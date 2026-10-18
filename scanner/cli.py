@@ -36,6 +36,7 @@ from scanner.report import reason_bucket, write_drop_log, write_report
 from scanner.salary import fill_salary
 from scanner.rules import AMBIGUOUS, LOCKED, SILENT, LocationRules, RoleRules
 from scanner import sources
+from scanner.sources.ats import _location_tags as location_tags
 from scanner.store import Store
 from scanner import board_health, seed_sources, watchlist
 
@@ -153,7 +154,10 @@ def run(config_path: Path, dry_run: bool, days: int | None, skip_llm: bool = Fal
             job.watchlist = True
         fetched_jobs.append(job)
     fetched = merge_jobs(fetched_jobs, _fill_missing)
+    tag_cfg = cfg.get("sources", {}).get("ats", {})
     for job in fetched.values():
+        if not job.regions and not job.countries and job.location:  # HN and boards give a header like "REMOTE (US, Canada)"
+            job.regions, job.countries = location_tags(job.location, tag_cfg)
         fill_salary(job)
         store.upsert(job, today)
 

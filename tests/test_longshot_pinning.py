@@ -61,3 +61,28 @@ def test_norway_is_a_country_code_not_yaml_false():
 def test_new_mexico_is_not_mexico(location, countries):
     cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())["sources"]["ats"]
     assert ats._location_tags(location, cfg)[1] == countries
+
+
+@pytest.mark.parametrize("location,expected", [
+    ("REMOTE (US, Canada)", "longshot"),
+    ("Remote (Europe)", "longshot"),
+    ("REMOTE (Global)", "check"),
+    ("Remote", "check"),
+])
+def test_untagged_sources_get_tags_from_their_location_text(tmp_path, monkeypatch, location, expected):
+    cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
+    cfg["sources"] = {"freehire": {"first_run_days": 3}, "ats": cfg["sources"]["ats"]}
+    cfg["sources"]["ats"]["enabled"] = False
+    cfg["output"] = {"jobs_dir": "jobs", "state_dir": "state"}
+    cfg["liveness"]["enabled"] = False
+    config = tmp_path / "config.yml"
+    config.write_text(yaml.safe_dump(cfg))
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli.CompanyProfiles, "enrich_report", lambda self, jobs: None)
+    job = Job(id="hn::1", source="hn", url="https://news.ycombinator.com/item?id=1", title="Senior Python Engineer",
+              company="Acme", company_key="acme", description="Build Python Django PostgreSQL Redis services. " * 20,
+              location=location, first_seen_at=datetime.now(timezone.utc))
+    monkeypatch.setattr(cli.sources, "fetch_all", lambda *args: iter([job]))
+    monkeypatch.setattr(cli.LocationRules, "classify", lambda self, job: Verdict("silent", "silent"))
+    cli.run(config, dry_run=False, days=3, skip_llm=True)
+    assert job.bucket == expected
