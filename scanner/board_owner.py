@@ -4,6 +4,7 @@ A slug guess ("basecamp" on Personio) can hit a different company's board, a dem
 board, or a board that redirects to an unrelated custom domain. The board's own
 landing page names its owner (<title>, og:site_name), so a guessed board is accepted
 only when that name matches the company, or the page links to the company's website.
+A board that links a different company domain (and never ours) belongs to a same-name company.
 Boards found on the company's own careers page are trusted and skip this check.
 """
 
@@ -51,6 +52,13 @@ greenhouse lever ashby workable smartrecruiters recruitee breezy bamboohr pinpoi
 AGGREGATORS = ("ycombinator.com", "himalayas.app", "startup.jobs", "workable.com", "linkedin.com", "angel.co",
                "wellfound.com", "notion.site")
 DEMO = re.compile(r"\b(?:hooli|acme corp(?:oration)?|lorem ipsum|sample job|\(sample\)|demo company)\b|\"acme\"", re.I)
+# Linked domains that never name the board's owner.
+NOT_OWNERS = ATS_DOMAINS + AGGREGATORS + ("greenhouse.com", "ashbyprd.com", "teamtailor-cdn.com", "facebook.com",
+              "instagram.com", "twitter.com", "x.com", "tiktok.com", "youtube.com", "github.com", "google.com",
+              "cloudfront.net", "amazonaws.com", "glassdoor.com", "medium.com")
+# The board's own links: <a href>/mailto, plus Ashby's publicWebsite and Greenhouse's logo href in the page JSON.
+LINKED = re.compile(r"""<a\s[^>]*href=["'](?:https?://|mailto:[^@"'\s]+@)([a-z0-9.-]+)"""
+                    r'''|"(?:publicWebsite|href)":"https?:(?:\\?/){2}([a-z0-9.-]+)''', re.I)
 OWNER_FIELDS = (
     re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S),
     re.compile(r"<meta[^>]+property=[\"']og:(?:site_name|title)[\"'][^>]+content=[\"']([^\"']+)", re.I),
@@ -78,6 +86,24 @@ def owner_names(page: str) -> list[str]:
         for raw in rx.findall(page):
             names += [p.strip() for p in re.split(r"\s+[|\-–—:]\s+", html.unescape(raw).strip()) if p.strip()]
     return names
+
+
+def _mentions(page: str, site: str) -> bool:
+    return bool(re.search(rf"(?:https?://|[\"'/.@])(?:www\.)?{re.escape(site)}\b", page))
+
+
+def linked_domains(page: str) -> set[str]:
+    """Company domains the board links to as its own (website, apply email), minus ATS/social/CDN hosts."""
+    return {d for m in LINKED.finditer(page) for h in m.groups() if h and (d := _domain(h)) and not d.endswith(NOT_OWNERS)}
+
+
+def _same_owner(session: requests.Session, domain: str, site: str) -> bool | None:
+    """Is a domain the board links to still our company (spotifyjobs.com, railway.app -> railway.com)?"""
+    ours, theirs = site.split(".")[0], domain.split(".")[0]
+    if theirs.startswith(ours) and theirs[len(ours):] in NOISE:  # bandlab -> bandlabtechnologies.com
+        return True
+    resp = _get(session, f"https://{domain}")
+    return None if resp is None else _domain(resp.url) == site or _mentions(resp.text, site)
 
 
 def _get(session: requests.Session, url: str):
@@ -121,10 +147,23 @@ def owns(session: requests.Session, ats: str, board: str, company: str, website:
             return None
         if DEMO.search(postings.text):
             return False
+    if site and not _mentions(page, site):
+        if ats == "personio":  # its landing page links nobody; the postings carry the employer's domain
+            feed = _get(session, f"https://{quote(board, safe='')}.jobs.personio.de/xml")
+            page += feed.text if feed is not None and feed.ok else ""
+        if not _mentions(page, site) and (foreign := linked_domains(page)):
+            unknown = False
+            for domain in sorted(foreign):
+                same = _same_owner(session, domain, site)
+                if same:
+                    break
+                unknown |= same is None
+            else:  # a same-name company: the board links its own, different domain
+                return None if unknown else False
     names = [n for n in owner_names(page) if _tokens(n)]
     if any(names_match(name, target) for name in names for target in [company, *(aliases or [])]):
         return True
-    if site and re.search(rf"(?:https?://|[\"'/.@])(?:www\.)?{re.escape(site)}\b", page):
+    if site and _mentions(page, site):
         return True
     # A page that names nobody (a script-rendered board): only an exact, distinctive slug counts.
     return not names and len(wanted) >= 6 and re.sub(r"[^a-z0-9]", "", board.lower()) == wanted
