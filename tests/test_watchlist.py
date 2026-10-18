@@ -81,6 +81,7 @@ def test_workable_adapter_skips_detail_for_wrong_title(monkeypatch):
             ]}
         return {"description": "<p>Python backend</p>"}
     monkeypatch.setattr(ats, "get", fake_get)
+    monkeypatch.setattr(ats, "workable_jobs", lambda *a: None)
     jobs = ats.fetch_board(_entry("workable"), ATS_CFG)
     assert len(jobs) == 1 and jobs[0].id == "workable:example:good"
     assert len(calls) == 1
@@ -97,6 +98,38 @@ def test_workable_falls_back_when_widget_is_limited(monkeypatch):
     jobs = ats.fetch_board(_entry("workable"), ATS_CFG)
     assert len(jobs) == 1 and jobs[0].id == "workable:example:good"
     assert jobs[0].posted_at.tzinfo == timezone.utc
+
+
+def _jobs_workable(monkeypatch) -> list[str]:
+    data = json.loads(Path("tests/fixtures/ats/jobs_workable.json").read_text())
+    calls = []
+    def fake_get(session, url, **kwargs):
+        calls.append(url)
+        assert "apply.workable.com" not in url
+        return data["search"] if url.endswith("/jobs") else data["form"] if url.endswith("/form") else data["company"]
+    monkeypatch.setattr(ats, "get", fake_get)
+    return calls
+
+
+def test_workable_board_is_read_from_jobs_workable(monkeypatch, tmp_path):
+    calls = _jobs_workable(monkeypatch)
+    entry = {"company": "CloudLinux", "ats": "workable", "board": "cloudlinux-1"}
+    cfg = {**ATS_CFG, "filters": {}, "health_dir": str(tmp_path)}  # every fixture title passes
+    jobs = {j.id: j for j in ats.fetch_board(entry, cfg)}
+    dbre = jobs["workable:cloudlinux-1:5VvmuX4WGiDuHSfGMHfejQ"]  # three per-location copies fold into one
+    assert len([j for j in jobs.values() if "Database Reliability" in j.title]) == 1
+    assert "Montenegro" in dbre.location and "Armenia" in dbre.location
+    assert dbre.url.startswith("https://jobs.workable.com/view/5VvmuX4WGiDuHSfGMHfejQ/")
+    assert dbre.employment_type == "full_time" and dbre.posted_at and "<" not in dbre.description
+    assert len(calls) == 3
+    calls.clear()
+    ats.fetch_board(entry, cfg)  # the company id is cached in board health
+    assert calls == ["https://jobs.workable.com/api/v1/companies/de96ad05-a4db-4fb2-b905-361995090aa8"]
+
+
+def test_workable_lookup_needs_our_board_in_the_gdpr_link(monkeypatch):
+    _jobs_workable(monkeypatch)
+    assert ats.workable_jobs(requests.Session(), {"company": "CloudLinux", "board": "cloudlinux"}, None) is None
 
 
 def test_workable_markdown_feed_parser(monkeypatch):

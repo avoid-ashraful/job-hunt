@@ -26,12 +26,12 @@ def read(directory: Path | None, ats: str, board: str) -> dict:
 
 
 def record(directory: Path | None, ats: str, board: str, *, jobs: int | None = None,
-           error: int | str | None = None, today: str | None = None) -> None:
+           error: int | str | None = None, today: str | None = None, **extra) -> None:
     if directory is None:
         return
     today = today or date.today().isoformat()
     health = read(directory, ats, board)
-    health.update(ats=ats, board=board, last_checked=today, error=error)
+    health.update(ats=ats, board=board, last_checked=today, error=error, **extra)
     health["not_found_failures"] = health.get("not_found_failures", 0) + 1 if error in (404, 410) else 0
     health["other_failures"] = health.get("other_failures", 0) + 1 if error is not None and error not in (404, 410) else 0
     if error is None:
