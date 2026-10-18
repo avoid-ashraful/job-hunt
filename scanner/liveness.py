@@ -78,6 +78,8 @@ def check(job: Job) -> str:
     if ats == "lever" and board and ext:
         return _status(f"https://api.lever.co/v0/postings/{board}/{ext}")
     if ats == "workable" and board and ext:
+        if urlsplit(job.url).hostname == "jobs.workable.com":  # ext is its view id, and its quota is separate
+            return _status(f"https://jobs.workable.com/api/v1/jobs/{ext}")
         return _status(f"https://apply.workable.com/api/v2/accounts/{board}/jobs/{ext}")
     if ats == "smartrecruiters" and board and ext:
         return _status(f"https://api.smartrecruiters.com/v1/companies/{board}/postings/{ext}")

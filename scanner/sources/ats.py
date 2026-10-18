@@ -164,6 +164,65 @@ def workable_markdown(session: requests.Session, board: str) -> list[dict]:
     return rows
 
 
+_JOBS_WORKABLE = "https://jobs.workable.com/api/v1"
+
+
+def _view_id(url: str) -> str:
+    return urlparse(url).path.split("/")[2]
+
+
+def _workable_account(session: requests.Session, company: dict) -> str | None:
+    """Find the jobs.workable.com company whose apply.workable.com board is ours (its GDPR link names the board)."""
+    data = get(session, f"{_JOBS_WORKABLE}/jobs", params={"query": company["company"]})
+    seen: dict[str, dict] = {}
+    for raw in data.get("jobs") or []:
+        seen.setdefault((raw.get("company") or {}).get("id") or "", raw)
+    name = normalize_company(company["company"])
+    candidates = sorted(seen.items(), key=lambda kv: normalize_company(kv[1]["company"].get("title") or "") != name)
+    for account, raw in candidates[:3]:
+        form = get(session, f"{_JOBS_WORKABLE}/jobs/{_view_id(raw['url'])}/form", params={"includeAccountMetadata": "true"})
+        gdpr = next((x["accountMetadata"].get("gdprPolicyUrl") or "" for x in form if "accountMetadata" in x), "")
+        if account and gdpr.lower().startswith(f"https://apply.workable.com/{company['board'].lower()}/"):
+            return account
+    return None
+
+
+def workable_listing(session: requests.Session, account: str, limit: int = 200) -> list[dict]:
+    """jobs.workable.com lists one copy per location; fold them back into one widget-shaped posting each."""
+    groups: dict[tuple, list[dict]] = {}
+    token = None
+    for _ in range(max(1, limit // 20)):
+        data = get(session, f"{_JOBS_WORKABLE}/companies/{account}", params={"pageToken": token} if token else None)
+        for raw in data.get("jobs") or []:
+            if raw.get("state") == "published":
+                groups.setdefault((raw.get("title"), raw.get("description")), []).append(raw)
+        if not (token := data.get("nextPageToken")):
+            break
+    rows = []
+    for copies in groups.values():
+        first = min(copies, key=lambda r: _view_id(r["url"]))  # the same copy every run keeps the job id stable
+        places = dict.fromkeys(p for r in copies for p in r.get("locations") or [] if p != "TELECOMMUTE")
+        rows.append({
+            "shortcode": _view_id(first["url"]), "title": first.get("title") or "", "url": first["url"],
+            "location": "; ".join(places) or "Remote", "telecommuting": first.get("workplace") == "remote",
+            "workplace_type": first.get("workplace"), "created_at": first.get("created"),
+            "employmentType": str(first.get("employmentType") or "").lower().replace("-", "_") or None,
+            "description": " ".join(str(first.get(k) or "") for k in ("description", "requirementsSection", "benefitsSection")),
+        })
+    return rows
+
+
+def workable_jobs(session: requests.Session, company: dict, account: str | None,
+                  limit: int = 200) -> tuple[str, list[dict]] | None:
+    """jobs.workable.com has its own quota, so apply.workable.com lockouts don't hide the board; None means use the widget."""
+    try:
+        account = account or _workable_account(session, company)
+        return (account, workable_listing(session, account, limit)) if account else None
+    except Exception as exc:
+        log.info("jobs.workable.com %s unavailable, using the widget: %s", company["board"], exc)
+        return None
+
+
 def _parse_personio_xml(text: str, board: str) -> list[dict]:
     try:
         root = ET.fromstring(text)
@@ -522,6 +581,7 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
         session.headers.update({"Accept-Language": "en-US,en;q=0.9", "Origin": "https://apply.workable.com"})
     elif ats == "bamboohr":
         session.headers.update({"Accept": "application/json"})
+    account = None  # the jobs.workable.com company id; None clears a stale cached one
     try:
         url, params = _base(ats, board)
         used_fallback = False
@@ -540,6 +600,10 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
         elif ats == "teamtailor":
             text = get_text(session, url)
             raws = _parse_teamtailor_rss(text, board)
+        elif ats == "workable" and (found := workable_jobs(
+                session, company, board_health.read(health_dir, ats, board).get("workable_account"),
+                cfg.get("max_board_jobs", 200))):
+            account, raws = found
         else:
             try:
                 data = get(session, url, params=params)
@@ -558,7 +622,8 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
                     time.sleep(cfg.get("request_delay_s", 0.2))
                     params["offset"] = offset
                     raws.extend(_items(get(session, url, params=params), ats))
-        board_health.record(health_dir, ats, board, jobs=len(raws))
+        board_health.record(health_dir, ats, board, jobs=len(raws),
+                            **({"workable_account": account} if ats == "workable" else {}))
         out = []
         for raw in raws:
             try:
@@ -570,7 +635,8 @@ def fetch_board(company: dict, cfg: dict) -> list[Job]:
     except Exception as exc:
         response = getattr(exc, "response", None)
         error = response.status_code if response is not None else type(exc).__name__
-        board_health.record(health_dir, ats, board, error=error)
+        board_health.record(health_dir, ats, board, error=error,
+                            **({"workable_account": account} if ats == "workable" else {}))
         log.warning("ATS %s/%s failed: %s", ats, board, exc)
         return []
     finally:

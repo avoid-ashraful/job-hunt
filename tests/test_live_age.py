@@ -43,6 +43,16 @@ def test_workable_url_uses_actual_board_slug_for_liveness(monkeypatch):
     assert liveness.check(job) == liveness.OPEN
 
 
+def test_jobs_workable_posting_is_checked_on_jobs_workable(monkeypatch):
+    job = Job(id="workable:cloudlinux-1:5VvmuX4WGiDuHSfGMHfejQ", source="ats",
+              url="https://jobs.workable.com/view/5VvmuX4WGiDuHSfGMHfejQ/senior-dbre", title="DBRE",
+              company="CloudLinux", company_key="cloudlinux", description="Postgres")
+    calls = []
+    monkeypatch.setattr(liveness, "_status", lambda url: calls.append(url) or liveness.OPEN)
+    assert liveness.check(job) == liveness.OPEN
+    assert calls == ["https://jobs.workable.com/api/v1/jobs/5VvmuX4WGiDuHSfGMHfejQ"]
+
+
 def test_fresh_cross_source_copy_prevents_a_stale_source_age_drop():
     cfg = yaml.safe_load((Path(__file__).parents[1] / "config.example.yml").read_text())
     now = datetime(2026, 10, 17, tzinfo=timezone.utc)
